@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kalakal: live quizzes and polls anyone can join</title>
+<meta name="description" content="Quizzes, polls and party games that anyone can join in five seconds with a PIN. No app, no account.">
+<meta name="theme-color" content="#160B2A">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/img/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/img/apple-touch-icon-180.png">
+<link rel="preload" href="/fonts/catamaran.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/unbounded.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/kalakal.css">
+<style>
+  .home-nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 24px 0; }
+  .hero { display: flex; flex-wrap: wrap; gap: 48px; align-items: center; padding: 48px 0 72px; }
+  .hero-copy { flex: 1 1 440px; display: flex; flex-direction: column; gap: 22px; }
+  .hero-copy h1 { font-size: clamp(2.6rem, 6vw, 4.6rem); font-weight: 800; text-wrap: balance; }
+  .join-card { flex: 1 1 360px; max-width: 460px; }
+  .wordmark { width: min(300px, 70vw); height: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="home-nav">
+    <a class="brand" href="/"><img src="/img/icon.svg" alt="">kalakal</a>
+    <a class="btn btn-primary btn-sm" href="/host.html">Host a game</a>
+  </nav>
+  <main class="hero">
+    <div class="hero-copy">
+      <img class="wordmark" src="/img/logo.svg" alt="Kalakal">
+      <h1>Make every room Kalakal.</h1>
+      <p class="muted" style="font-size: 21px; max-width: 34rem">Quizzes and party games that anyone can join in five seconds with a PIN. No app, no account, just the whole room playing together.</p>
+      <div class="row"><a class="btn btn-primary" href="/host.html">Host a free game</a></div>
+    </div>
+    <form class="card join-card stack" id="join" autocomplete="off">
+      <h2 style="font-size: 26px">Join a game</h2>
+      <div class="field">
+        <label for="pin">Game PIN</label>
+        <input class="pin-input" id="pin" type="text" inputmode="numeric" pattern="[0-9 ]*" maxlength="7" placeholder="482 913" required>
+      </div>
+      <p class="error" id="err" role="alert" hidden></p>
+      <button class="btn btn-primary btn-block" type="submit">Enter</button>
+    </form>
+  </main>
+  <footer class="muted" style="padding: 24px 0; font-size: 15px">Kalakal is Tamil slang for "awesome".</footer>
+</div>
+<script>
+  document.getElementById("join").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const pin = document.getElementById("pin").value.replace(/\D/g, "");
+    const err = document.getElementById("err");
+    err.hidden = true;
+    if (pin.length !== 6) { err.textContent = "A game PIN has 6 digits."; err.hidden = false; return; }
+    try {
+      const r = await fetch("/api/games/" + pin).then((r) => r.json());
+      if (!r.exists) { err.textContent = "We couldn't find that game. Check the PIN on the big screen."; err.hidden = false; return; }
+      location.href = "/play.html?pin=" + pin;
+    } catch { err.textContent = "Connection problem. Try again."; err.hidden = false; }
+  });
+</script>
+</body>
+</html>

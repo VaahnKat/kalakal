@@ -25,6 +25,27 @@
   select { min-height: 44px; width: auto; font-size: 16px; }
   .icon-btn { background: transparent; border: 0; color: var(--mist); font-weight: 700; cursor: pointer; font-family: var(--body); font-size: 15px; min-height: 44px; padding: 0 10px; }
   .icon-btn:hover { color: var(--coral); }
+  .type-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 10px; }
+  .type-btn { text-align: left; background: var(--ink); border: 2px solid var(--line); border-radius: 14px; padding: 12px 16px; color: var(--cream); cursor: pointer; font-family: var(--body); min-height: 64px; }
+  .type-btn:hover { border-color: var(--teal); }
+  .type-btn strong { display: block; font-size: 17px; }
+  .type-btn span { font-size: 14px; color: var(--soft); }
+  .type-tag { background: var(--teal); color: var(--ink); border-radius: 99px; padding: 2px 12px; font-weight: 800; font-size: 14px; letter-spacing: 0; text-transform: none; }
+  /* engage */
+  .cloud { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 22px; padding: 10px; max-width: 1100px; margin: 0 auto; }
+  .cloud span { font-family: var(--display); font-weight: 800; line-height: 1.05; animation: pop .4s cubic-bezier(.2,1.4,.4,1); }
+  .wall { columns: 3 280px; column-gap: 16px; }
+  .note { break-inside: avoid; background: var(--night); border-radius: 18px; padding: 18px 20px; margin-bottom: 16px; font-size: 21px; font-weight: 600; display: flex; flex-direction: column; gap: 10px; animation: rise .4s ease both; }
+  .note .tools { display: flex; gap: 8px; justify-content: flex-end; }
+  .mini { background: transparent; border: 1px solid var(--line); color: var(--mist); border-radius: 10px; min-height: 36px; padding: 0 12px; font-family: var(--body); font-weight: 700; font-size: 14px; cursor: pointer; }
+  .mini:hover { border-color: var(--mist); color: var(--cream); }
+  .scale-row { display: flex; flex-direction: column; gap: 10px; }
+  .scale-track { position: relative; height: 14px; border-radius: 99px; background: linear-gradient(90deg, #3A2660, #19D3C5); margin: 26px 0 6px; }
+  .scale-dot { position: absolute; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 99px; background: var(--marigold); color: var(--ink); display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 800; font-size: 14px; transition: left .6s cubic-bezier(.2,.8,.2,1); box-shadow: 0 0 0 4px var(--ink); }
+  .qa-row { display: flex; align-items: center; gap: 16px; background: var(--night); border-radius: 18px; padding: 16px 20px; animation: rise .35s ease both; }
+  .qa-row.done { opacity: .5; }
+  .votes { min-width: 64px; text-align: center; font-family: var(--display); font-weight: 800; font-size: 22px; color: var(--marigold); }
+  details summary { cursor: pointer; color: var(--mist); font-weight: 700; padding: 6px 0; }
   /* lobby */
   .lobby { display: flex; gap: 36px; flex-wrap: wrap; padding: 12px 0 40px; flex: 1; }
   .join-panel { flex: 0 1 440px; display: flex; flex-direction: column; justify-content: space-between; gap: 28px; }
@@ -57,7 +78,7 @@
     <nav class="h-nav"><a class="brand" href="/"><img src="/img/icon.svg" alt="">kalakal</a></nav>
     <div class="stack" style="padding-bottom: 60px">
       <h1 style="font-size: clamp(32px, 4vw, 48px)">Host a game</h1>
-      <p class="muted">Pick a ready-made quiz or write your own. Players join on their phones with a PIN.</p>
+      <p class="muted">Pick a ready-made session or build your own with quiz questions, polls, word clouds, scales and Q&amp;A. Players join on their phones with a PIN.</p>
       <div class="choices">
         <div class="card stack">
           <p class="eyebrow">Ready to play</p>
@@ -66,10 +87,16 @@
           <button class="btn btn-primary" type="button" id="playDemo">Play this quiz</button>
         </div>
         <div class="card stack">
+          <p class="eyebrow">Ready to engage</p>
+          <h2 style="font-size: 24px" id="meetTitle"></h2>
+          <p class="muted">Word cloud, poll, team-health scale, a quiz question, open ideas and live Q&amp;A. Made for meetings and workshops.</p>
+          <button class="btn btn-primary" type="button" id="playMeeting">Run this session</button>
+        </div>
+        <div class="card stack">
           <p class="eyebrow">Your own</p>
-          <h2 style="font-size: 24px">Write your own quiz</h2>
-          <p class="muted">Up to 50 questions, 2 to 4 answers each. Your draft is saved in this browser.</p>
-          <button class="btn btn-ghost" type="button" id="openEditor">Open the quiz builder</button>
+          <h2 style="font-size: 24px">Build your own</h2>
+          <p class="muted">Mix up to 50 slides: quiz questions, polls, word clouds, open questions, scales and Q&amp;A. Your draft is saved in this browser.</p>
+          <button class="btn btn-ghost" type="button" id="openEditor">Open the builder</button>
         </div>
       </div>
       <p class="error" id="setupErr" role="alert" hidden></p>
@@ -82,9 +109,9 @@
   <div class="wrap">
     <nav class="h-nav"><a class="brand" href="/"><img src="/img/icon.svg" alt="">kalakal</a><button class="btn btn-ghost btn-sm" type="button" id="backToSetup">Back</button></nav>
     <div class="stack" style="padding-bottom: 120px">
-      <div class="field"><label for="quizTitle">Quiz title</label><input id="quizTitle" type="text" maxlength="80" placeholder="Friday team quiz"></div>
+      <div class="field"><label for="quizTitle">Session title</label><input id="quizTitle" type="text" maxlength="80" placeholder="Friday team session"></div>
       <div class="stack" id="qList"></div>
-      <div class="row"><button class="btn btn-ghost" type="button" id="addQ">Add question</button></div>
+      <div class="card stack"><p class="eyebrow">Add a slide</p><div class="type-picker" id="typePicker"></div></div>
       <p class="error" id="editErr" role="alert" hidden></p>
       <div class="row"><button class="btn btn-primary" type="button" id="playCustom">Create game</button><span class="muted" id="draftNote"></span></div>
     </div>
@@ -153,6 +180,27 @@
     <div style="text-align: center; padding-top: 24px" class="stack"><p class="eyebrow">Final results</p><h1 style="font-size: clamp(36px, 5vw, 60px)">Kalakal!</h1></div>
     <div class="podium" id="podium"></div>
     <div class="footer-bar"><button class="btn btn-ghost btn-sm" type="button" id="csvBtn">Download results (CSV)</button><a class="btn btn-primary" href="/host.html">New game</a></div>
+  </div>
+</section>
+
+<!-- 7. Interaction slide (Kalakal Kural) -->
+<section class="screen" data-screen="engage" hidden>
+  <div class="wrap stage">
+    <div class="footer-bar" style="padding-top: 20px"><div class="row"><span class="eyebrow" id="eNum"></span><span class="type-tag" id="eType"></span></div><span style="font-weight: 800; font-size: 20px" id="eCount"></span></div>
+    <h1 class="q-title" id="eTitle"></h1>
+    <p class="muted" style="text-align: center; margin-top: -12px" id="eHint"></p>
+    <div class="grow" id="eBody"></div>
+    <div class="footer-bar"><span class="muted" id="eJoin"></span><button class="btn btn-primary" type="button" id="eNext">Next</button></div>
+  </div>
+</section>
+
+<!-- 8. Session finished (no quiz questions) -->
+<section class="screen" data-screen="finished" hidden>
+  <div class="wrap stage" style="align-items: center; justify-content: center; text-align: center">
+    <div id="finMinni" class="float"></div>
+    <h1 style="font-size: clamp(34px, 5vw, 56px)">Thanks, everyone!</h1>
+    <p class="muted" id="finText"></p>
+    <div class="row" style="justify-content: center"><button class="btn btn-ghost btn-sm" type="button" id="finCsv">Download results (CSV)</button><a class="btn btn-primary" href="/host.html">New session</a></div>
   </div>
 </section>
 

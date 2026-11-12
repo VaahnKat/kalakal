@@ -1,15 +1,27 @@
-// Kalakal: live quiz server.
+// Kalakal: live quiz + audience interaction server.
 // One Worker serves the static site (public/) and the API.
-// Each game PIN maps to one GameRoom Durable Object that holds the live game.
+// Each game PIN maps to one GameRoom Durable Object that holds the live session.
+//
+// A session is a list of slides. Slide types:
+//   quiz      - question with a correct answer, timer, points       (Kalakal Play)
+//   poll      - multiple choice, live bar chart, no right answer    (Kalakal Kural)
+//   wordcloud - short words, bigger the more people send them
+//   open      - free-text answers shown as cards
+//   scale     - rate 1-4 statements from 1 to 5
+//   qa        - audience asks questions and upvotes each other's
 
 import { DurableObject } from "cloudflare:workers";
 
 const MAX_PLAYERS = 200;
-const MAX_QUESTIONS = 50;
+const MAX_SLIDES = 50;
 const NAME_MAX = 16;
 const COLORS = ["#FFB627", "#19D3C5", "#FF5D73", "#A78BFA"];
-// Short starter list; extend as needed. Matched as whole words, case-insensitive.
-const BLOCKED = ["fuck", "shit", "bitch", "cunt", "dick", "pussy", "nigger", "nigga", "whore", "slut", "fag", "rape", "nazi", "hitler", "porn", "sex"];
+const TYPES = ["quiz", "poll", "wordcloud", "open", "scale", "qa"];
+const LIMITS = { wordcloud: 3, open: 3, qa: 5 };           // submissions per person per slide
+const TEXT_MAX = { wordcloud: 25, open: 200, qa: 200 };
+const MAX_ITEMS = 2000;                                     // cap stored text items per slide
+// Short starter list; extend as needed. Matched as whole words (or inside squashed text for longer words).
+const BLOCKED = ["fuck", "fucking", "shit", "bitch", "cunt", "dick", "pussy", "nigger", "nigga", "whore", "slut", "fag", "rape", "nazi", "hitler", "porn", "sex", "asshole", "bastard"];
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
@@ -18,11 +30,10 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Create a game: POST /api/games  { quiz }
     if (url.pathname === "/api/games" && request.method === "POST") {
       let body;
       try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
-      const quiz = validateQuiz(body && body.quiz);
+      const quiz = validateSession(body && body.quiz);
       if (quiz.error) return json({ error: quiz.error }, 400);
       const hostKey = randomToken();
       for (let attempt = 0; attempt < 8; attempt++) {
@@ -34,19 +45,15 @@ export default {
       return json({ error: "Could not allocate a PIN, try again" }, 503);
     }
 
-    // Check a PIN: GET /api/games/123456
     let m = url.pathname.match(/^\/api\/games\/(\d{6})$/);
     if (m && request.method === "GET") {
-      const stub = env.ROOMS.get(env.ROOMS.idFromName(m[1]));
-      return stub.fetch("https://room/status");
+      return env.ROOMS.get(env.ROOMS.idFromName(m[1])).fetch("https://room/status");
     }
 
-    // Live connection: GET /ws/123456?role=host|player  (WebSocket upgrade)
     m = url.pathname.match(/^\/ws\/(\d{6})$/);
     if (m) {
       if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected WebSocket", { status: 426 });
-      const stub = env.ROOMS.get(env.ROOMS.idFromName(m[1]));
-      return stub.fetch(request);
+      return env.ROOMS.get(env.ROOMS.idFromName(m[1])).fetch(request);
     }
 
     if (url.pathname.startsWith("/api/")) return json({ error: "Not found" }, 404);
@@ -59,23 +66,40 @@ function clean(s, max) {
   return String(s ?? "").replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
-function validateQuiz(q) {
+function isRude(text) {
+  const lower = text.toLowerCase();
+  const words = lower.split(/[^a-z0-9]+/);
+  const squashed = lower.replace(/[^a-z]/g, "");
+  return BLOCKED.some((w) => words.includes(w) || (w.length >= 5 && squashed.includes(w)));
+}
+
+function validateSession(q) {
   if (!q || typeof q !== "object") return { error: "Missing quiz" };
-  const title = clean(q.title, 80) || "Kalakal quiz";
-  if (!Array.isArray(q.questions) || q.questions.length === 0) return { error: "Add at least one question" };
-  if (q.questions.length > MAX_QUESTIONS) return { error: `Max ${MAX_QUESTIONS} questions` };
-  const questions = [];
+  const title = clean(q.title, 80) || "Kalakal session";
+  if (!Array.isArray(q.questions) || q.questions.length === 0) return { error: "Add at least one slide" };
+  if (q.questions.length > MAX_SLIDES) return { error: `Max ${MAX_SLIDES} slides` };
+  const slides = [];
   for (const [i, item] of q.questions.entries()) {
+    const n = i + 1;
+    const type = TYPES.includes(item && item.type) ? item.type : "quiz";
     const text = clean(item && item.text, 200);
-    if (!text) return { error: `Question ${i + 1} has no text` };
-    const answers = (Array.isArray(item.answers) ? item.answers : []).map((a) => clean(a, 80)).filter(Boolean);
-    if (answers.length < 2 || answers.length > 4) return { error: `Question ${i + 1} needs 2 to 4 answers` };
-    const correct = Number(item.correct);
-    if (!Number.isInteger(correct) || correct < 0 || correct >= answers.length) return { error: `Question ${i + 1} has no correct answer` };
-    const time = Math.min(120, Math.max(5, Number(item.time) || 20));
-    questions.push({ text, answers, correct, time });
+    if (!text) return { error: `Slide ${n} has no question text` };
+    if (type === "quiz" || type === "poll") {
+      const answers = (Array.isArray(item.answers) ? item.answers : []).map((a) => clean(a, 80)).filter(Boolean);
+      if (answers.length < 2 || answers.length > 4) return { error: `Slide ${n} needs 2 to 4 answers` };
+      if (type === "quiz") {
+        const correct = Number(item.correct);
+        if (!Number.isInteger(correct) || correct < 0 || correct >= answers.length) return { error: `Slide ${n} has no correct answer` };
+        const time = Math.min(120, Math.max(5, Number(item.time) || 20));
+        slides.push({ type, text, answers, correct, time });
+      } else slides.push({ type, text, answers });
+    } else if (type === "scale") {
+      const statements = (Array.isArray(item.statements) ? item.statements : []).map((s) => clean(s, 80)).filter(Boolean).slice(0, 4);
+      if (!statements.length) return { error: `Slide ${n} needs at least one statement to rate` };
+      slides.push({ type, text, statements, low: clean(item.low, 24) || "Disagree", high: clean(item.high, 24) || "Agree" });
+    } else slides.push({ type, text });
   }
-  return { value: { title, questions } };
+  return { value: { title, questions: slides } };
 }
 
 function randomToken() {
@@ -86,29 +110,32 @@ function randomToken() {
 function cleanName(raw) {
   const name = clean(raw, NAME_MAX);
   if (name.length < 2) return { error: "Pick a nickname with at least 2 characters" };
-  const lower = name.toLowerCase();
-  const words = lower.split(/[^a-z0-9]+/);
-  const squashed = lower.replace(/[^a-z]/g, "");
-  if (BLOCKED.some((w) => words.includes(w) || (w.length >= 4 && squashed.includes(w)))) return { error: "Please choose a friendlier nickname" };
+  if (isRude(name)) return { error: "Please choose a friendlier nickname" };
   return { value: name };
 }
 
-// ---------- the live game ----------
+// ---------- the live session ----------
 export class GameRoom extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.setup = null;         // { pin, quiz, hostKey, createdAt }
     this.players = new Map();  // pid -> { id, name, color, score, streak, socket, connected, answers: {} }
     this.hosts = new Set();
-    this.phase = "lobby";      // lobby | question | reveal | leaderboard | podium
-    this.qIndex = -1;
+    this.phase = "lobby";      // lobby | question | reveal | leaderboard | engage | podium | finished
+    this.qIndex = -1;          // current slide
     this.qStartedAt = 0;
     this.timer = null;
     this.locked = false;
+    this.responses = {};       // slide index -> response store (interaction slides)
+    this.pushTimer = null;
     this.ready = ctx.blockConcurrencyWhile(async () => {
       this.setup = (await ctx.storage.get("setup")) || null;
     });
   }
+
+  get slides() { return this.setup.quiz.questions; }
+  get slide() { return this.slides[this.qIndex]; }
+  get hasQuiz() { return this.slides.some((s) => s.type === "quiz"); }
 
   async fetch(request) {
     await this.ready;
@@ -119,7 +146,7 @@ export class GameRoom extends DurableObject {
       if (fresh) return new Response("PIN in use", { status: 409 });
       const { pin, quiz, hostKey } = await request.json();
       this.setup = { pin, quiz, hostKey, createdAt: Date.now() };
-      this.players.clear(); this.phase = "lobby"; this.qIndex = -1; this.locked = false;
+      this.players.clear(); this.phase = "lobby"; this.qIndex = -1; this.locked = false; this.responses = {};
       await this.ctx.storage.put("setup", this.setup);
       return new Response("ok");
     }
@@ -129,13 +156,11 @@ export class GameRoom extends DurableObject {
       return json({ exists: true, phase: this.phase, locked: this.locked, players: this.players.size });
     }
 
-    // WebSocket
     if (!this.setup) return new Response("No such game", { status: 404 });
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     server.accept();
-    const role = url.searchParams.get("role") === "host" ? "host" : "player";
-    if (role === "host") this.acceptHost(server);
+    if (url.searchParams.get("role") === "host") this.acceptHost(server);
     else this.acceptPlayer(server);
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -169,7 +194,6 @@ export class GameRoom extends DurableObject {
       let msg; try { msg = JSON.parse(ev.data); } catch { return; }
       if (!player) {
         if (msg.t !== "join") return;
-        // Rejoin with an existing player id (refresh / dropped Wi-Fi)
         if (msg.pid && this.players.has(msg.pid)) {
           player = this.players.get(msg.pid);
           if (player.socket && player.socket !== ws) { try { player.socket.close(4000, "replaced"); } catch {} }
@@ -180,7 +204,7 @@ export class GameRoom extends DurableObject {
           return;
         }
         if (this.locked) { this.send(ws, { t: "error", message: "This game is locked. Ask the host to unlock it." }); return; }
-        if (this.phase === "podium") { this.send(ws, { t: "error", message: "This game has finished." }); return; }
+        if (this.phase === "podium" || this.phase === "finished") { this.send(ws, { t: "error", message: "This session has finished." }); return; }
         if (this.players.size >= MAX_PLAYERS) { this.send(ws, { t: "error", message: "This game is full." }); return; }
         const n = cleanName(msg.name);
         if (n.error) { this.send(ws, { t: "error", message: n.error }); return; }
@@ -196,26 +220,21 @@ export class GameRoom extends DurableObject {
         return;
       }
       if (msg.t === "answer") this.onAnswer(player, msg);
+      else if (msg.t === "respond") this.onRespond(player, msg);
     });
-    const drop = () => {
-      if (player && player.socket === ws) { player.connected = false; this.broadcastLobby(); }
-    };
+    const drop = () => { if (player && player.socket === ws) { player.connected = false; this.broadcastLobby(); } };
     ws.addEventListener("close", drop); ws.addEventListener("error", drop);
   }
 
   // ----- host controls -----
   onHostMessage(msg) {
-    const quiz = this.setup.quiz;
     switch (msg.t) {
       case "start":
-        if (this.phase === "lobby" && this.players.size > 0) this.startQuestion(0);
+        if (this.phase === "lobby" && this.players.size > 0) this.startSlide(0);
         break;
       case "next":
         if (this.phase === "reveal") this.showLeaderboard();
-        else if (this.phase === "leaderboard") {
-          if (this.qIndex + 1 < quiz.questions.length) this.startQuestion(this.qIndex + 1);
-          else this.showPodium();
-        }
+        else if (this.phase === "leaderboard" || this.phase === "engage") this.advance();
         break;
       case "skip":
         if (this.phase === "question") this.reveal();
@@ -233,26 +252,50 @@ export class GameRoom extends DurableObject {
       case "lock":
         this.locked = !!msg.locked; this.broadcastLobby();
         break;
+      case "hide":       // hide an open-text card or Q&A question
+      case "answered": { // mark a Q&A question as answered (toggle)
+        const store = this.responses[this.qIndex];
+        if (this.phase !== "engage" || !store || !store.items) break;
+        const item = store.items.find((x) => x.id === msg.id);
+        if (!item) break;
+        if (msg.t === "hide") item.hidden = !item.hidden; else item.answered = !item.answered;
+        this.pushResults(true);
+        break;
+      }
       case "end":
-        this.showPodium();
+        this.showEnd();
         break;
     }
   }
 
-  // ----- game flow -----
-  startQuestion(i) {
-    const q = this.setup.quiz.questions[i];
-    this.phase = "question"; this.qIndex = i; this.qStartedAt = Date.now();
+  advance() {
+    if (this.qIndex + 1 < this.slides.length) this.startSlide(this.qIndex + 1);
+    else this.showEnd();
+  }
+
+  startSlide(i) {
     clearTimeout(this.timer);
+    this.qIndex = i;
+    if (this.slides[i].type === "quiz") return this.startQuestion(i);
+    this.phase = "engage";
+    if (!this.responses[i]) this.responses[i] = this.newStore(this.slides[i]);
+    this.toHosts({ t: "engage", index: i, total: this.slides.length, slide: this.slides[i], results: this.results(i), players: this.players.size });
+    this.toPlayers((p) => this.engageForPlayer(p));
+  }
+
+  // ----- quiz flow -----
+  startQuestion(i) {
+    const q = this.slides[i];
+    this.phase = "question"; this.qStartedAt = Date.now();
     this.timer = setTimeout(() => this.reveal(), q.time * 1000 + 300);
-    const base = { t: "question", index: i, total: this.setup.quiz.questions.length, text: q.text, answers: q.answers, time: q.time, remaining: q.time * 1000 };
+    const base = { t: "question", index: i, total: this.slides.length, text: q.text, answers: q.answers, time: q.time, remaining: q.time * 1000 };
     this.toHosts({ ...base, answered: 0, players: this.players.size });
     this.toPlayers(() => base);
   }
 
   onAnswer(p, msg) {
     if (this.phase !== "question" || msg.q !== this.qIndex || p.answers[this.qIndex]) return;
-    const q = this.setup.quiz.questions[this.qIndex];
+    const q = this.slide;
     const choice = Number(msg.choice);
     if (!Number.isInteger(choice) || choice < 0 || choice >= q.answers.length) return;
     const elapsed = Math.min(Date.now() - this.qStartedAt, q.time * 1000);
@@ -267,25 +310,20 @@ export class GameRoom extends DurableObject {
     if (this.phase !== "question") return;
     clearTimeout(this.timer);
     this.phase = "reveal";
-    const q = this.setup.quiz.questions[this.qIndex];
+    const q = this.slide;
     const counts = q.answers.map(() => 0);
     for (const p of this.players.values()) {
       const a = p.answers[this.qIndex];
       if (a) counts[a.choice]++;
       if (a && a.choice === q.correct) {
-        // Up to 1000 points for speed (never below 500 for a right answer), plus a streak bonus.
         const speed = 1 - a.elapsed / (q.time * 1000) / 2;
         p.streak += 1;
-        const bonus = Math.min(500, (p.streak - 1) * 100);
-        a.points = Math.round(1000 * speed) + bonus;
+        a.points = Math.round(1000 * speed) + Math.min(500, (p.streak - 1) * 100);
         p.score += a.points;
-      } else {
-        p.streak = 0;
-        if (a) a.points = 0;
-      }
+      } else { p.streak = 0; if (a) a.points = 0; }
     }
     const ranked = this.ranked();
-    this.toHosts({ t: "reveal", index: this.qIndex, correct: q.correct, counts, text: q.text, answers: q.answers, last: this.qIndex + 1 >= this.setup.quiz.questions.length });
+    this.toHosts({ t: "reveal", index: this.qIndex, correct: q.correct, counts, text: q.text, answers: q.answers, last: this.qIndex + 1 >= this.slides.length });
     ranked.forEach((p, idx) => {
       const a = p.answers[this.qIndex];
       this.toPlayer(p, { t: "result", answered: !!a, correct: !!a && a.choice === q.correct, points: a ? a.points : 0, score: p.score, streak: p.streak, rank: idx + 1, players: ranked.length, correctText: q.answers[q.correct] });
@@ -295,19 +333,129 @@ export class GameRoom extends DurableObject {
   showLeaderboard() {
     this.phase = "leaderboard";
     const top = this.ranked().slice(0, 5).map((p) => ({ name: p.name, score: p.score, streak: p.streak, color: p.color }));
-    this.toHosts({ t: "leaderboard", top, index: this.qIndex, total: this.setup.quiz.questions.length, last: this.qIndex + 1 >= this.setup.quiz.questions.length });
+    this.toHosts({ t: "leaderboard", top, index: this.qIndex, total: this.slides.length, last: this.qIndex + 1 >= this.slides.length });
   }
 
-  showPodium() {
+  showEnd() {
     clearTimeout(this.timer);
+    const summary = this.summary();
+    if (!this.hasQuiz) {
+      this.phase = "finished";
+      this.toHosts({ t: "finished", players: this.players.size, summary });
+      this.toPlayers(() => ({ t: "thanks" }));
+      return;
+    }
     this.phase = "podium";
     const ranked = this.ranked();
-    this.toHosts({ t: "podium", top: ranked.slice(0, 3).map((p) => ({ name: p.name, score: p.score, color: p.color })), players: ranked.length, results: ranked.map((p, i) => ({ rank: i + 1, name: p.name, score: p.score })) });
+    this.toHosts({ t: "podium", top: ranked.slice(0, 3).map((p) => ({ name: p.name, score: p.score, color: p.color })), players: ranked.length, results: ranked.map((p, i) => ({ rank: i + 1, name: p.name, score: p.score })), summary });
     ranked.forEach((p, idx) => this.toPlayer(p, { t: "final", rank: idx + 1, score: p.score, players: ranked.length }));
   }
 
   ranked() {
     return [...this.players.values()].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+  }
+
+  // ----- interaction slides (Kalakal Kural) -----
+  newStore(s) {
+    if (s.type === "poll") return { counts: s.answers.map(() => 0), voters: new Map() };
+    if (s.type === "scale") return { sums: s.statements.map(() => 0), dist: s.statements.map(() => [0, 0, 0, 0, 0]), voters: new Map() };
+    if (s.type === "wordcloud") return { words: new Map(), per: new Map() };
+    return { items: [], per: new Map(), seq: 0 }; // open, qa
+  }
+
+  onRespond(p, msg) {
+    if (this.phase !== "engage" || msg.s !== this.qIndex) return;
+    const s = this.slide, store = this.responses[this.qIndex];
+    const reply = (extra) => this.toPlayer(p, { t: "respond_ack", s: this.qIndex, ...extra });
+
+    if (s.type === "poll") {
+      const choice = Number(msg.choice);
+      if (!Number.isInteger(choice) || choice < 0 || choice >= s.answers.length) return;
+      const prev = store.voters.get(p.id);
+      if (prev !== undefined) store.counts[prev]--;          // allow changing your vote
+      store.voters.set(p.id, choice); store.counts[choice]++;
+      reply({ choice });
+    } else if (s.type === "scale") {
+      const vals = Array.isArray(msg.values) ? msg.values : [];
+      if (vals.length !== s.statements.length) return;
+      const nums = vals.map((v) => Number(v));
+      if (nums.some((v) => !Number.isInteger(v) || v < 1 || v > 5)) return;
+      const prev = store.voters.get(p.id);
+      if (prev) prev.forEach((v, k) => { store.sums[k] -= v; store.dist[k][v - 1]--; });
+      nums.forEach((v, k) => { store.sums[k] += v; store.dist[k][v - 1]++; });
+      store.voters.set(p.id, nums);
+      reply({ values: nums });
+    } else if (s.type === "wordcloud" || s.type === "open" || (s.type === "qa" && msg.ask !== undefined)) {
+      const text = clean(s.type === "qa" ? msg.ask : msg.text, TEXT_MAX[s.type]);
+      if (!text) return;
+      if (isRude(text)) return this.toPlayer(p, { t: "respond_error", message: "Please keep it friendly." });
+      const used = store.per.get(p.id) || 0;
+      if (used >= LIMITS[s.type]) return this.toPlayer(p, { t: "respond_error", message: "You've used all your answers for this one." });
+      store.per.set(p.id, used + 1);
+      if (s.type === "wordcloud") {
+        const key = text.toLowerCase();
+        const w = store.words.get(key);
+        if (w) w.count++; else if (store.words.size < MAX_ITEMS) store.words.set(key, { text, count: 1 });
+      } else if (store.items.length < MAX_ITEMS) {
+        store.items.push({ id: ++store.seq, text, votes: new Set(), hidden: false, answered: false, by: p.id });
+      }
+      reply({ left: LIMITS[s.type] - used - 1 });
+    } else if (s.type === "qa" && msg.vote !== undefined) {
+      const item = store.items.find((x) => x.id === Number(msg.vote));
+      if (!item || item.hidden || item.by === p.id) return;
+      if (item.votes.has(p.id)) item.votes.delete(p.id); else item.votes.add(p.id);  // toggle upvote
+      reply({ vote: item.id, on: item.votes.has(p.id) });
+    } else return;
+    this.pushResults();
+  }
+
+  // Throttled live updates (at most ~4 per second)
+  pushResults(now = false) {
+    const send = () => {
+      this.pushTimer = null;
+      if (this.phase !== "engage") return;
+      const i = this.qIndex, results = this.results(i);
+      this.toHosts({ t: "results", index: i, results, players: this.players.size });
+      if (this.slide.type === "qa") this.toPlayers(() => ({ t: "qa_list", s: i, items: this.qaPublic(i) }));
+    };
+    if (now) { clearTimeout(this.pushTimer); send(); return; }
+    if (!this.pushTimer) this.pushTimer = setTimeout(send, 250);
+  }
+
+  results(i) {
+    const s = this.slides[i], st = this.responses[i];
+    if (!st) return null;
+    if (s.type === "poll") return { counts: st.counts, responses: st.voters.size };
+    if (s.type === "scale") return { averages: st.sums.map((sum) => (st.voters.size ? +(sum / st.voters.size).toFixed(2) : null)), dist: st.dist, responses: st.voters.size };
+    if (s.type === "wordcloud") {
+      const words = [...st.words.values()].sort((a, b) => b.count - a.count).slice(0, 60);
+      return { words, responses: st.per.size };
+    }
+    const items = st.items.map((x) => ({ id: x.id, text: x.text, votes: x.votes.size, hidden: x.hidden, answered: x.answered }));
+    if (s.type === "qa") items.sort((a, b) => Number(a.answered) - Number(b.answered) || b.votes - a.votes || a.id - b.id);
+    return { items, responses: st.per.size };
+  }
+
+  qaPublic(i) {
+    return this.results(i).items.filter((x) => !x.hidden).map(({ id, text, votes, answered }) => ({ id, text, votes, answered }));
+  }
+
+  engageForPlayer(p) {
+    const i = this.qIndex, s = this.slides[i], st = this.responses[i];
+    const msg = { t: "engage", index: i, total: this.slides.length, slide: s };
+    if (s.type === "poll") msg.mine = st.voters.has(p.id) ? st.voters.get(p.id) : null;
+    if (s.type === "scale") msg.mine = st.voters.get(p.id) || null;
+    if (st.per) msg.left = LIMITS[s.type] - (st.per.get(p.id) || 0);
+    if (s.type === "qa") {
+      msg.items = this.qaPublic(i);
+      msg.myVotes = st.items.filter((x) => x.votes.has(p.id)).map((x) => x.id);
+      msg.myItems = st.items.filter((x) => x.by === p.id).map((x) => x.id);
+    }
+    return msg;
+  }
+
+  summary() {
+    return this.slides.map((s, i) => ({ type: s.type, text: s.text, answers: s.answers, statements: s.statements, results: s.type === "quiz" ? null : this.results(i) }));
   }
 
   broadcastLobby() {
@@ -316,28 +464,25 @@ export class GameRoom extends DurableObject {
     if (this.phase === "lobby") this.toPlayers(() => ({ t: "lobby_wait", players: list.length }));
   }
 
-  // State for a host who connects or reconnects
   hostSnapshot() {
-    const quiz = this.setup.quiz;
     const players = [...this.players.values()].map((p) => ({ id: p.id, name: p.name, color: p.color, connected: p.connected }));
-    const snap = { t: "snapshot", pin: this.setup.pin, title: quiz.title, total: quiz.questions.length, phase: this.phase, players, locked: this.locked };
+    const snap = { t: "snapshot", pin: this.setup.pin, title: this.setup.quiz.title, total: this.slides.length, phase: this.phase, players, locked: this.locked };
     if (this.phase === "question") {
-      const q = quiz.questions[this.qIndex];
-      snap.question = { index: this.qIndex, text: q.text, answers: q.answers, time: q.time, remaining: Math.max(0, q.time * 1000 - (Date.now() - this.qStartedAt)), answered: players.filter((x) => this.players.get(x.id).answers[this.qIndex]).length };
+      const q = this.slide;
+      snap.question = { index: this.qIndex, text: q.text, answers: q.answers, time: q.time, remaining: Math.max(0, q.time * 1000 - (Date.now() - this.qStartedAt)), answered: [...this.players.values()].filter((p) => p.answers[this.qIndex]).length };
     }
+    if (this.phase === "engage") snap.engage = { index: this.qIndex, total: this.slides.length, slide: this.slide, results: this.results(this.qIndex), players: players.length };
     return snap;
   }
 
-  // State for a player who joins or rejoins mid-game
   playerSnapshot(p) {
     if (this.phase === "question") {
-      const q = this.setup.quiz.questions[this.qIndex];
-      return { t: "question", index: this.qIndex, total: this.setup.quiz.questions.length, text: q.text, answers: q.answers, time: q.time, remaining: Math.max(0, q.time * 1000 - (Date.now() - this.qStartedAt)), alreadyAnswered: !!p.answers[this.qIndex] };
+      const q = this.slide;
+      return { t: "question", index: this.qIndex, total: this.slides.length, text: q.text, answers: q.answers, time: q.time, remaining: Math.max(0, q.time * 1000 - (Date.now() - this.qStartedAt)), alreadyAnswered: !!p.answers[this.qIndex] };
     }
-    if (this.phase === "podium") {
-      const ranked = this.ranked();
-      return { t: "final", rank: ranked.indexOf(p) + 1, score: p.score, players: ranked.length };
-    }
+    if (this.phase === "engage") return this.engageForPlayer(p);
+    if (this.phase === "podium") { const ranked = this.ranked(); return { t: "final", rank: ranked.indexOf(p) + 1, score: p.score, players: ranked.length }; }
+    if (this.phase === "finished") return { t: "thanks" };
     if (this.phase === "lobby") return { t: "lobby_wait", players: this.players.size };
     return { t: "between", score: p.score, streak: p.streak };
   }

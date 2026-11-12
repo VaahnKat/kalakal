@@ -73,6 +73,14 @@ function onMessage(m) {
     case "answer_ack": locked(m.choice); break;
     case "result": result(m); break;
     case "final": final(m); break;
+    case "engage": engageStart(m); break;
+    case "respond_ack": engageAck(m); break;
+    case "respond_error": engageNote(m.message, true); break;
+    case "qa_list": if (eng && eng.index === m.s) { eng.items = m.items; renderQa(); } break;
+    case "thanks":
+      localStorage.removeItem("kalakal:" + pin);
+      message("Thanks for taking part!", "The session has finished. Kalakal!", "happy");
+      break;
     case "kicked":
       localStorage.removeItem("kalakal:" + pin);
       message("You were removed", "The host removed you from this game.", "sad");
@@ -139,4 +147,111 @@ function message(title, text, mood) {
   $("#msgTitle").textContent = title;
   $("#msgText").textContent = text;
   show("message");
+}
+
+// ---------- interaction slides (Kalakal Kural) ----------
+let eng = null; // { index, slide, mine, left, items, myVotes:Set, myItems:Set, sent:[] }
+
+function engageStart(m) {
+  eng = { index: m.index, slide: m.slide, mine: m.mine ?? null, left: m.left, items: m.items || [], myVotes: new Set(m.myVotes || []), myItems: new Set(m.myItems || []), sent: [] };
+  $("#eCount").textContent = `${m.index + 1} / ${m.total}`;
+  $("#eText").textContent = m.slide.text;
+  const s = m.slide, box = $("#eBox");
+  if (s.type === "poll") {
+    box.innerHTML = `<div class="e-opts">${s.answers.map((a, i) => `<button class="answer a${i}" type="button" data-i="${i}">${SHAPES[i]}<span>${esc(a)}</span></button>`).join("")}</div><p class="muted" id="eNote" role="status"></p>`;
+    box.querySelectorAll("[data-i]").forEach((b) => b.addEventListener("click", () => conn.send({ t: "respond", s: eng.index, choice: Number(b.dataset.i) })));
+    if (eng.mine !== null) markPoll(eng.mine);
+  } else if (s.type === "wordcloud" || s.type === "open" || s.type === "qa") {
+    const isWord = s.type === "wordcloud", isQa = s.type === "qa";
+    box.innerHTML = `
+      <form class="stack" id="eForm" autocomplete="off">
+        <label for="eInput">${isWord ? "Your word" : isQa ? "Your question" : "Your answer"}</label>
+        ${isWord ? `<input id="eInput" type="text" maxlength="25" placeholder="One or two words" required>` : `<textarea id="eInput" maxlength="200" placeholder="${isQa ? "Ask anything" : "Type your answer"}" required></textarea>`}
+        <button class="btn btn-primary btn-block" type="submit" id="eSend">${isQa ? "Ask" : "Send"}</button>
+        <p class="muted" id="eNote" role="status"></p>
+      </form>
+      <div class="sent" id="eSent"></div>
+      ${isQa ? '<p class="eyebrow" style="margin-top:8px">Questions · tap to upvote</p><div class="stack" id="qaList" style="gap:10px"></div>' : ""}`;
+    $("#eForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const v = $("#eInput").value.trim(); if (!v) return;
+      eng.pending = v;
+      conn.send(isQa ? { t: "respond", s: eng.index, ask: v } : { t: "respond", s: eng.index, text: v });
+      $("#eSend").disabled = true;
+    });
+    updateLeft();
+    if (isQa) {
+      renderQa();
+      $("#qaList").addEventListener("click", (e) => {
+        const b = e.target.closest("[data-vote]"); if (!b) return;
+        conn.send({ t: "respond", s: eng.index, vote: Number(b.dataset.vote) });
+      });
+    }
+  } else if (s.type === "scale") {
+    const vals = eng.mine ? eng.mine.slice() : s.statements.map(() => null);
+    box.innerHTML = s.statements.map((st, k) => `
+      <div class="stack" style="gap:8px"><p style="font-weight:800">${esc(st)}</p>
+        <div class="rate" role="group" aria-label="${esc(st)}">${[1, 2, 3, 4, 5].map((v) => `<button type="button" data-k="${k}" data-v="${v}" aria-pressed="${vals[k] === v}">${v}</button>`).join("")}</div>
+        <div class="row" style="justify-content:space-between;font-size:14px"><span class="muted">${esc(s.low)}</span><span class="muted">${esc(s.high)}</span></div></div>`).join("")
+      + `<button class="btn btn-primary btn-block" type="button" id="eRate" ${vals.every(Boolean) ? "" : "disabled"}>${eng.mine ? "Update" : "Send"}</button><p class="muted" id="eNote" role="status"></p>`;
+    box.querySelectorAll("[data-k]").forEach((b) => b.addEventListener("click", () => {
+      const k = Number(b.dataset.k); vals[k] = Number(b.dataset.v);
+      box.querySelectorAll(`[data-k="${k}"]`).forEach((x) => x.setAttribute("aria-pressed", String(Number(x.dataset.v) === vals[k])));
+      $("#eRate").disabled = !vals.every(Boolean);
+    }));
+    $("#eRate").addEventListener("click", () => conn.send({ t: "respond", s: eng.index, values: vals }));
+    if (eng.mine) engageNote("Thanks! You can change your ratings and send again.");
+  }
+  show("engage");
+}
+
+function markPoll(choice) {
+  document.querySelectorAll("#eBox [data-i]").forEach((b) => {
+    const on = Number(b.dataset.i) === choice;
+    b.classList.toggle("chosen", on); b.classList.toggle("dim", !on);
+  });
+  engageNote("Vote sent. Tap another option to change it.");
+}
+
+function engageNote(text, isError = false) {
+  const n = $("#eNote"); if (!n) return;
+  n.textContent = text; n.className = isError ? "error" : "ok-note";
+  const send = $("#eSend"); if (send && isError) send.disabled = false;
+}
+
+function updateLeft() {
+  const left = eng.left;
+  const input = $("#eInput"), send = $("#eSend");
+  if (!input) return;
+  const done = left <= 0;
+  input.disabled = done; send.disabled = done;
+  if (done) engageNote(eng.slide.type === "qa" ? "Thanks! You've asked the maximum number of questions." : "Thanks! You've sent all your answers.");
+  else if (eng.sent.length) engageNote(`Sent! You can send ${left} more.`);
+}
+
+function engageAck(m) {
+  if (!eng || m.s !== eng.index) return;
+  const s = eng.slide;
+  if (s.type === "poll") { eng.mine = m.choice; markPoll(m.choice); navigator.vibrate && navigator.vibrate(20); return; }
+  if (s.type === "scale") { eng.mine = m.values; $("#eRate").textContent = "Update"; engageNote("Thanks! You can change your ratings and send again."); return; }
+  if (m.vote !== undefined) { if (m.on) eng.myVotes.add(m.vote); else eng.myVotes.delete(m.vote); renderQa(); return; }
+  if (m.left !== undefined) {
+    eng.left = m.left;
+    if (eng.pending) { eng.sent.push(eng.pending); eng.pending = null; }
+    $("#eInput").value = "";
+    $("#eSent").innerHTML = eng.sent.map((t) => `<span>${esc(t)}</span>`).join("");
+    $("#eSend").disabled = false;
+    navigator.vibrate && navigator.vibrate(20);
+    updateLeft();
+  }
+}
+
+function renderQa() {
+  const list = $("#qaList"); if (!list || !eng) return;
+  list.innerHTML = eng.items.length ? eng.items.map((x) => {
+    const mine = eng.sent.includes(x.text) || eng.myItems.has(x.id);
+    return `<div class="qa-item ${x.answered ? "done" : ""}">
+      ${mine ? `<span class="up" style="display:flex;align-items:center;justify-content:center">${x.votes}</span>` : `<button class="up" type="button" data-vote="${x.id}" aria-pressed="${eng.myVotes.has(x.id)}" aria-label="Upvote, ${x.votes} votes">▲ ${x.votes}</button>`}
+      <span style="flex:1;font-weight:600">${esc(x.text)}${x.answered ? ' <span class="muted">· answered</span>' : mine ? ' <span class="muted">· yours</span>' : ""}</span></div>`;
+  }).join("") : '<p class="muted">No questions yet. Be the first!</p>';
 }

@@ -1,6 +1,8 @@
 import { SHAPES, SHAPE_NAMES, esc, $, show, connect, startTimer, confetti } from "/js/common.js";
 import { DEMO_QUIZ, DEMO_MEETING, SLIDE_TYPES, TYPE_LABEL, blankSlide } from "/js/quizzes.js";
 import { avatarSvg } from "/js/avatar.js";
+import { parseQuick, parseSpreadsheetFile, toCSV, TEMPLATE_CSV, aiPrompt, mediaFromLink } from "/js/quicktype.js";
+import { compressImage, ytThumb, mediaHtml, parseTime, fmtTime } from "/js/media.js";
 
 const params = new URLSearchParams(location.search);
 let pin = (params.get("pin") || "").replace(/\D/g, "");
@@ -30,12 +32,24 @@ $("#backToSetup").addEventListener("click", () => show("setup"));
 // One draft per mode, kept in this browser
 if (localStorage.getItem("kalakal:draft") && !localStorage.getItem("kalakal:draft:play")) localStorage.setItem("kalakal:draft:play", localStorage.getItem("kalakal:draft"));
 let draft = null;
-const saveDraft = () => { localStorage.setItem("kalakal:draft:" + builderMode, JSON.stringify(draft)); $("#draftNote").textContent = "Draft saved"; };
+function saveDraft() {
+  try { localStorage.setItem("kalakal:draft:" + builderMode, JSON.stringify(draft)); $("#draftNote").textContent = "Draft saved in this browser"; }
+  catch { $("#draftNote").textContent = "Too big to save in this browser: use picture links instead of uploads for some questions."; }
+}
+// Older drafts stored one correct answer as a number
+function tidy(q) {
+  if (q.type === "quiz") {
+    if (!Array.isArray(q.correct)) q.correct = [Number(q.correct) || 0];
+    if (q.points === undefined) q.points = 1;
+    if (!q.tf) while (q.answers.length < 4) q.answers.push("");
+  }
+  return q;
+}
 
 function openBuilder(mode) {
   builderMode = mode;
   draft = JSON.parse(localStorage.getItem("kalakal:draft:" + mode) || "null") || { title: "", questions: [blankSlide(mode === "play" ? "quiz" : "poll")] };
-  draft.questions.forEach((q) => { if (!q.type) q.type = "quiz"; });
+  draft.questions.forEach((q) => { if (!q.type) q.type = "quiz"; tidy(q); });
   $("#builderMode").textContent = mode === "play" ? "Kalakal Play · Quiz game" : "Kalakal Kural · Live polls & feedback";
   $("#builderMode").className = "mode-chip " + (mode === "kural" ? "kural" : "");
   $("#builderHint").textContent = mode === "play" ? "Players score points for right, fast answers." : "No scores: answers show live and anonymously.";
@@ -52,13 +66,38 @@ $("#typePicker").addEventListener("click", (e) => {
   const inputs = document.querySelectorAll('#qList [data-f="text"]'); inputs[inputs.length - 1].focus();
 });
 
+const TICK = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="#160B2A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function mediaEditor(q, qi) {
+  const m = q.media;
+  if (!m) return `<div class="q-media-edit">
+      <button class="btn btn-ghost btn-sm" type="button" data-f="upload">Add picture</button>
+      <input type="text" data-f="link" placeholder="…or paste a picture, GIF or YouTube link" aria-label="Slide ${qi + 1} picture or YouTube link">
+    </div><p class="q-tip">Tip: you can also drag a picture onto this card, or paste one with Ctrl/Cmd+V.</p>`;
+  if (m.kind === "image") return `<div class="q-media-prev"><img src="${esc(m.src)}" alt="Picture for slide ${qi + 1}"><span class="muted">Picture shows on the big screen.</span><button class="icon-btn" type="button" data-f="unmedia">Remove picture</button></div>`;
+  return `<div class="q-media-prev"><img src="${ytThumb(m)}" alt="" onerror="this.style.visibility='hidden'">
+      <div class="stack" style="gap: 6px"><span style="font-weight: 800">YouTube video</span>
+        <div class="yt-times"><label class="muted" for="ys${qi}">Start</label><input id="ys${qi}" type="text" data-f="ytstart" placeholder="0:00" value="${fmtTime(m.start)}"><label class="muted" for="ye${qi}">End</label><input id="ye${qi}" type="text" data-f="ytend" placeholder="end" value="${fmtTime(m.end)}"></div></div>
+      <button class="icon-btn" type="button" data-f="unmedia">Remove video</button></div>`;
+}
+
 function slideFields(q, qi) {
   const n = qi + 1;
-  if (q.type === "quiz" || q.type === "poll") {
+  if (q.type === "quiz") {
+    const count = q.tf ? 2 : 4, several = q.correct.length > 1;
+    return `${mediaEditor(q, qi)}
+      <div class="q-answers">${q.answers.slice(0, count).map((a, ai) => {
+        const on = q.correct.includes(ai);
+        return `<div class="q-ans a${ai}${on ? " is-right" : ""}">${SHAPES[ai]}
+        <input type="text" data-f="ans" data-a="${ai}" maxlength="80" placeholder="Answer ${ai + 1}${ai > 1 ? " (optional)" : ""}" value="${esc(a)}" aria-label="Slide ${n}, answer ${ai + 1} (${SHAPE_NAMES[ai]})">
+        <button class="mark" type="button" data-f="mark" data-a="${ai}" aria-pressed="${on}" aria-label="Slide ${n}, answer ${ai + 1} is right"><span class="tick">${TICK}</span>Right</button>
+      </div>`; }).join("")}</div>
+      <p class="q-tip">${several ? `${q.correct.length} right answers: any of them scores.` : "Tap Right on the correct answer. Mark more than one if several are right."} Press Enter to jump to the next box.</p>`;
+  }
+  if (q.type === "poll") {
     return `<div class="q-answers">${q.answers.map((a, ai) => `
       <div class="q-ans a${ai}">${SHAPES[ai]}
-        <input type="text" data-f="ans" data-a="${ai}" maxlength="80" placeholder="${q.type === "poll" ? "Option" : "Answer"} ${ai + 1}${ai > 1 ? " (optional)" : ""}" value="${esc(a)}" aria-label="Slide ${n}, ${q.type === "poll" ? "option" : "answer"} ${ai + 1} (${SHAPE_NAMES[ai]})">
-        ${q.type === "quiz" ? `<label class="ok"><input type="radio" name="c${qi}" data-f="correct" data-a="${ai}" ${q.correct === ai ? "checked" : ""}>Correct</label>` : ""}
+        <input type="text" data-f="ans" data-a="${ai}" maxlength="80" placeholder="Option ${ai + 1}${ai > 1 ? " (optional)" : ""}" value="${esc(a)}" aria-label="Slide ${n}, option ${ai + 1} (${SHAPE_NAMES[ai]})">
       </div>`).join("")}</div>`;
   }
   if (q.type === "scale") {
@@ -74,9 +113,12 @@ function renderEditor() {
   $("#quizTitle").value = draft.title;
   $("#qList").innerHTML = draft.questions.map((q, qi) => `
     <div class="card q-card" data-q="${qi}">
-      <div class="q-head"><div class="row"><p class="eyebrow">Slide ${qi + 1}</p><span class="type-tag">${TYPE_LABEL[q.type]}</span></div>
+      <div class="q-head"><div class="row"><p class="eyebrow">Slide ${qi + 1}</p><span class="type-tag">${q.tf ? "True or false" : TYPE_LABEL[q.type]}</span></div>
         <div class="row">${q.type === "quiz" ? `<label class="muted" for="t${qi}" style="font-weight:600">Time</label>
-          <select id="t${qi}" data-f="time">${[10, 15, 20, 30, 45, 60].map((s) => `<option value="${s}" ${s === q.time ? "selected" : ""}>${s} s</option>`).join("")}</select>` : ""}
+          <select id="t${qi}" data-f="time">${[10, 15, 20, 30, 45, 60].map((s) => `<option value="${s}" ${s === q.time ? "selected" : ""}>${s} s</option>`).join("")}</select>
+          <label class="muted" for="p${qi}" style="font-weight:600">Points</label>
+          <select id="p${qi}" data-f="points">${[[1, "Normal"], [2, "Double"], [0, "No points"]].map(([v, l]) => `<option value="${v}" ${v === q.points ? "selected" : ""}>${l}</option>`).join("")}</select>` : ""}
+          <button class="icon-btn" type="button" data-f="dup" aria-label="Duplicate slide ${qi + 1}">Duplicate</button>
           ${qi > 0 ? `<button class="icon-btn" type="button" data-f="up" aria-label="Move slide ${qi + 1} up">Move up</button>` : ""}
           <button class="icon-btn" type="button" data-f="remove" aria-label="Remove slide ${qi + 1}">Remove</button></div></div>
       <input type="text" data-f="text" maxlength="200" placeholder="${{ quiz: "Type your question", poll: "What do you want to ask?", wordcloud: "e.g. One word for this week", open: "e.g. What should we start doing?", scale: "e.g. How are we doing?", qa: "e.g. Ask me anything" }[q.type]}" value="${esc(q.text)}" aria-label="Slide ${qi + 1} question">
@@ -91,7 +133,8 @@ $("#qList").addEventListener("input", (e) => {
   if (f === "text") q.text = e.target.value;
   if (f === "ans") q.answers[a] = e.target.value;
   if (f === "time") q.time = Number(e.target.value);
-  if (f === "correct") q.correct = a;
+  if (f === "points") q.points = Number(e.target.value);
+  if (f === "ytstart" || f === "ytend") { q.media[f === "ytstart" ? "start" : "end"] = parseTime(e.target.value); }
   if (f === "low") q.low = e.target.value;
   if (f === "high") q.high = e.target.value;
   if (f === "stmt") {
@@ -104,16 +147,120 @@ $("#qList").addEventListener("input", (e) => {
   saveDraft();
 });
 $("#qList").addEventListener("click", (e) => {
-  const f = e.target.dataset.f; if (f !== "remove" && f !== "up") return;
-  const i = Number(e.target.closest("[data-q]").dataset.q);
-  if (f === "remove") { draft.questions.splice(i, 1); if (!draft.questions.length) draft.questions.push(blankSlide("quiz")); }
-  if (f === "up") [draft.questions[i - 1], draft.questions[i]] = [draft.questions[i], draft.questions[i - 1]];
+  const btn = e.target.closest("[data-f]"); if (!btn) return;
+  const f = btn.dataset.f, card = btn.closest("[data-q]"); if (!card) return;
+  const i = Number(card.dataset.q), q = draft.questions[i];
+  if (f === "mark") {
+    const a = Number(btn.dataset.a), at = q.correct.indexOf(a);
+    if (at >= 0) { if (q.correct.length > 1) q.correct.splice(at, 1); } else q.correct.push(a);
+    q.correct.sort();
+  } else if (f === "remove") { draft.questions.splice(i, 1); if (!draft.questions.length) draft.questions.push(blankSlide(builderMode === "play" ? "quiz" : "poll")); }
+  else if (f === "up") [draft.questions[i - 1], draft.questions[i]] = [draft.questions[i], draft.questions[i - 1]];
+  else if (f === "dup") draft.questions.splice(i + 1, 0, JSON.parse(JSON.stringify(q)));
+  else if (f === "unmedia") delete q.media;
+  else if (f === "upload") { pickPicture(i); return; }
+  else return;
   saveDraft(); renderEditor();
+});
+
+// Paste a picture/YouTube link
+$("#qList").addEventListener("change", (e) => {
+  if (e.target.dataset.f !== "link") return;
+  const i = Number(e.target.closest("[data-q]").dataset.q), m = mediaFromLink(e.target.value);
+  if (!m) { e.target.value = ""; e.target.placeholder = "That doesn't look like a picture or YouTube link"; return; }
+  draft.questions[i].media = m; saveDraft(); renderEditor();
+});
+
+async function addPicture(i, file) {
+  try { draft.questions[i].media = { kind: "image", src: await compressImage(file) }; saveDraft(); renderEditor(); }
+  catch (err) { $("#editErr").textContent = err.message; $("#editErr").hidden = false; }
+}
+function pickPicture(i) {
+  const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+  inp.onchange = () => inp.files[0] && addPicture(i, inp.files[0]); inp.click();
+}
+// Drag a picture onto a quiz card, or paste one while typing in it
+$("#qList").addEventListener("dragover", (e) => { const c = e.target.closest(".q-card"); if (c && draft.questions[c.dataset.q].type === "quiz") { e.preventDefault(); c.classList.add("drop"); } });
+$("#qList").addEventListener("dragleave", (e) => { const c = e.target.closest(".q-card"); c && c.classList.remove("drop"); });
+$("#qList").addEventListener("drop", (e) => {
+  const c = e.target.closest(".q-card"); if (!c) return; e.preventDefault(); c.classList.remove("drop");
+  const file = [...(e.dataTransfer.files || [])].find((f) => f.type.startsWith("image/"));
+  if (file) return addPicture(Number(c.dataset.q), file);
+  const m = mediaFromLink(e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain"));
+  if (m) { draft.questions[c.dataset.q].media = m; saveDraft(); renderEditor(); }
+});
+$("#qList").addEventListener("paste", (e) => {
+  const c = e.target.closest(".q-card"); if (!c || draft.questions[c.dataset.q].type !== "quiz") return;
+  const file = [...(e.clipboardData.items || [])].map((it) => it.kind === "file" && it.getAsFile()).find((f) => f && f.type.startsWith("image/"));
+  if (file) { e.preventDefault(); addPicture(Number(c.dataset.q), file); }
+});
+
+// Enter moves to the next box; on the last answer of the last slide it adds a new slide
+$("#qList").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
+  const el = e.target; if (!el.matches('input[type="text"]') || el.dataset.f === "link") return;
+  e.preventDefault();
+  const card = el.closest("[data-q]"), boxes = [...card.querySelectorAll('input[data-f="text"], input[data-f="ans"], input[data-f="stmt"]')];
+  const at = boxes.indexOf(el);
+  if (at >= 0 && at < boxes.length - 1) return boxes[at + 1].focus();
+  const next = card.nextElementSibling;
+  if (next) return next.querySelector('input[data-f="text"]').focus();
+  const cur = draft.questions[Number(card.dataset.q)];
+  draft.questions.push(cur.type === "quiz" ? { ...blankSlide(cur.tf ? "truefalse" : "quiz"), time: cur.time, points: 1 } : blankSlide(cur.type));
+  saveDraft(); renderEditor();
+  const inputs = document.querySelectorAll('#qList [data-f="text"]'); inputs[inputs.length - 1].focus();
+});
+
+// ---------- paste / type questions ----------
+const dlg = $("#pasteDlg");
+$("#openPaste").addEventListener("click", () => { $("#pasteErr").hidden = true; dlg.showModal(); $("#pasteText").focus(); previewPaste(); });
+$("#pasteClose").addEventListener("click", () => dlg.close());
+function previewPaste() {
+  const { slides, errors } = parseQuick($("#pasteText").value);
+  $("#pasteCount").textContent = slides.length ? `${slides.length} question${slides.length > 1 ? "s" : ""} ready` : "Preview";
+  $("#pastePrev").innerHTML = slides.length ? slides.map((q, i) => `<div class="pp-q"><p>${i + 1}. ${esc(q.text)}${q.type === "poll" ? ' <span class="muted">(poll)</span>' : ""}${q.points === 2 ? ' <span class="muted">· double</span>' : ""}${q.media ? ' <span class="muted">· ' + (q.media.kind === "youtube" ? "video" : "picture") + "</span>" : ""}</p><ul>${q.answers.filter(Boolean).map((a, ai) => `<li class="${q.type === "quiz" && q.correct.includes(ai) ? "r" : ""}">${q.type === "quiz" && q.correct.includes(ai) ? "✓ " : "· "}${esc(a)}</li>`).join("")}</ul></div>`).join("")
+    : '<p class="muted">Your questions will appear here as you type.</p>';
+  const err = $("#pasteErr"); err.hidden = !errors.length; err.textContent = errors.slice(0, 4).join(" · ") + (errors.length > 4 ? ` · and ${errors.length - 4} more` : "");
+  return slides;
+}
+$("#pasteText").addEventListener("input", previewPaste);
+function addSlides(slides, replace) {
+  const keep = replace ? [] : draft.questions.filter((q) => (q.text || "").trim() || (q.answers || []).some((a) => a.trim()));
+  draft.questions = keep.concat(slides.map(tidy)).slice(0, 50);
+  saveDraft(); renderEditor();
+}
+for (const [id, replace] of [["pasteAdd", false], ["pasteReplace", true]]) {
+  $("#" + id).addEventListener("click", () => {
+    const slides = previewPaste();
+    if (!slides.length) { $("#pasteErr").textContent = "Nothing to add yet. Type a question, then its answers on the next lines."; $("#pasteErr").hidden = false; return; }
+    if (replace && !confirm(`Replace all ${draft.questions.length} slides with ${slides.length} new ones?`)) return;
+    addSlides(slides, replace); dlg.close(); $("#pasteText").value = "";
+  });
+}
+$("#copyPrompt").addEventListener("click", async () => {
+  const b = $("#copyPrompt");
+  try { await navigator.clipboard.writeText(aiPrompt(draft.title.trim() || "[your topic]")); b.textContent = "Copied! Paste it into your AI, then paste the reply here"; }
+  catch { $("#pasteText").value = aiPrompt(); previewPaste(); b.textContent = "Prompt placed in the box: copy it from there"; }
+  setTimeout(() => (b.textContent = "Copy AI prompt (ChatGPT, Claude, Gemini)"), 5000);
+});
+
+// ---------- spreadsheet ----------
+const download = (name, text, type = "text/csv;charset=utf-8") => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); };
+$("#templateBtn").addEventListener("click", () => download("kalakal-quiz-template.csv", TEMPLATE_CSV));
+$("#exportBtn").addEventListener("click", () => download(`${(draft.title.trim() || "kalakal-quiz").replace(/[^\w-]+/g, "-").toLowerCase()}.csv`, toCSV(draft.questions)));
+$("#importBtn").addEventListener("click", () => $("#importFile").click());
+$("#importFile").addEventListener("change", async (e) => {
+  const file = e.target.files[0]; e.target.value = ""; if (!file) return;
+  const err = $("#importErr"); err.hidden = true;
+  if (/\.xlsx?$/i.test(file.name)) { err.textContent = "Save the sheet as CSV first (File → Download → CSV), or copy the rows and use Paste."; err.hidden = false; return; }
+  const { slides, errors } = parseSpreadsheetFile(await file.text());
+  if (slides.length) addSlides(slides, false);
+  if (errors.length || !slides.length) { err.textContent = (slides.length ? `Added ${slides.length}. Skipped: ` : "Nothing imported. ") + errors.slice(0, 4).join(" · "); err.hidden = false; }
 });
 
 $("#playCustom").addEventListener("click", () => {
   const err = $("#editErr"); err.hidden = true;
-  const out = [];
+  const out = [], media = [];
   for (const [i, q] of draft.questions.entries()) {
     const n = i + 1, text = (q.text || "").trim();
     const blank = !text && (q.answers || []).every((a) => !a.trim()) && (q.statements || []).every((s) => !s.trim());
@@ -123,9 +270,10 @@ $("#playCustom").addEventListener("click", () => {
       const filled = q.answers.map((a, ai) => ({ a: a.trim(), ai })).filter((x) => x.a);
       if (filled.length < 2) return fail(`Slide ${n} needs at least 2 ${q.type === "poll" ? "options" : "answers"}.`);
       if (q.type === "quiz") {
-        const correct = filled.findIndex((x) => x.ai === q.correct);
-        if (correct < 0) return fail(`Slide ${n}: the answer marked correct is empty.`);
-        out.push({ type: "quiz", text, answers: filled.map((x) => x.a), correct, time: q.time });
+        const correct = filled.map((x, xi) => (q.correct.includes(x.ai) ? xi : -1)).filter((x) => x >= 0);
+        if (!correct.length) return fail(`Slide ${n}: tap Right on the correct answer (the one marked is empty).`);
+        media[out.length] = q.media || null;
+        out.push({ type: "quiz", text, answers: filled.map((x) => x.a), correct, time: q.time, points: q.points ?? 1 });
       } else out.push({ type: "poll", text, answers: filled.map((x) => x.a) });
     } else if (q.type === "scale") {
       const statements = q.statements.map((s) => s.trim()).filter(Boolean);
@@ -134,11 +282,13 @@ $("#playCustom").addEventListener("click", () => {
     } else out.push({ type: q.type, text });
   }
   if (!out.length) return fail("Add at least one slide.");
-  createGame({ title: draft.title.trim() || (builderMode === "play" ? "My Kalakal quiz" : "My Kalakal session"), questions: out }, err);
+  createGame({ title: draft.title.trim() || (builderMode === "play" ? "My Kalakal quiz" : "My Kalakal session"), questions: out }, err, media);
   function fail(t) { err.textContent = t; err.hidden = false; }
 });
 
-async function createGame(quiz, errEl) {
+// Pictures and videos stay in this browser tab (the big screen); phones only get the answers
+let mediaList = [];
+async function createGame(quiz, errEl, media = []) {
   errEl.hidden = true;
   try {
     const res = await fetch("/api/games", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ quiz }) });
@@ -146,6 +296,8 @@ async function createGame(quiz, errEl) {
     if (!res.ok) throw new Error(data.error || "Could not create the game");
     localStorage.setItem("kalakal:host:" + data.pin, data.hostKey);
     pin = data.pin;
+    mediaList = media;
+    try { sessionStorage.setItem("kalakal:media:" + pin, JSON.stringify(media)); } catch { /* too big to keep across a refresh */ }
     history.replaceState(null, "", "/host.html?pin=" + pin);
     openGame();
   } catch (e) { errEl.textContent = e.message; errEl.hidden = false; }
@@ -154,6 +306,7 @@ async function createGame(quiz, errEl) {
 // ---------- live session ----------
 function openGame() {
   const key = localStorage.getItem("kalakal:host:" + pin);
+  if (!mediaList.length) try { mediaList = JSON.parse(sessionStorage.getItem("kalakal:media:" + pin) || "[]"); } catch { mediaList = []; }
   if (!key) { message("Not your game", "This browser didn't create game " + pin + ".", "sad"); return; }
   $("#bigPin").textContent = pin.replace(/(\d{3})(\d{3})/, "$1 $2");
   $("#joinHost").textContent = location.host;
@@ -223,25 +376,29 @@ function question(m) {
   $("#qTitle").textContent = m.text;
   $("#qAnswers").innerHTML = answerTiles(m.answers);
   $("#answered").textContent = `${m.answered || 0} of ${m.players} answered`;
-  $("#qMinni").innerHTML = M("host-thinking", 130, "Host is thinking");
+  const media = mediaList[m.index];
+  $("#qMedia").hidden = !media; $("#qMedia").innerHTML = mediaHtml(media);
+  $("#qMinni").innerHTML = M("host-thinking", media ? 96 : 130, "Host is thinking");
+  $("#qX2").hidden = !(m.points === 2 || m.points === 0); $("#qX2").textContent = m.points === 2 ? "Double points" : "No points: warm-up";
   stopTimer && stopTimer();
   stopTimer = startTimer($("#timer"), m.time * 1000, m.remaining, null);
   clearTimeout(question.hurry);
-  question.hurry = setTimeout(() => { $("#qMinni").innerHTML = M("host-surprised", 130, "Hurry!"); }, Math.max(0, m.remaining - 5000));
+  question.hurry = setTimeout(() => { $("#qMinni").innerHTML = M("host-surprised", media ? 96 : 130, "Hurry!"); }, Math.max(0, m.remaining - 5000));
   show("question");
 }
 
 function barsHtml(answers, counts, highlight) {
+  const right = (i) => highlight !== undefined && (Array.isArray(highlight) ? highlight.includes(i) : i === highlight);
   const total = Math.max(1, counts.reduce((a, b) => a + b, 0));
   return answers.map((a, i) => `
-    <div class="bar-row" style="${highlight === undefined || i === highlight ? "" : "opacity:.45"}">
-      <div style="flex: 0 0 34%; display:flex; align-items:center; gap:12px; font-weight:800; font-size:22px">${SHAPES[i].replace("<svg ", '<svg width="26" height="26" style="filter:invert(1);flex-shrink:0" ')}<span>${esc(a)}</span>${i === highlight ? ' <span class="pill" style="margin-left:6px">Correct</span>' : ""}</div>
+    <div class="bar-row" style="${highlight === undefined || right(i) ? "" : "opacity:.45"}">
+      <div style="flex: 0 0 34%; display:flex; align-items:center; gap:12px; font-weight:800; font-size:22px">${SHAPES[i].replace("<svg ", '<svg width="26" height="26" style="filter:invert(1);flex-shrink:0" ')}<span>${esc(a)}</span>${right(i) ? ' <span class="pill" style="margin-left:6px">Correct</span>' : ""}</div>
       <div style="flex:1"><div class="bar a${i}" data-w="${(counts[i] / total) * 100}" style="width:max(48px, ${(counts[i] / total) * 100}%)">${counts[i]}${highlight === undefined && counts[i] ? ` · ${Math.round((counts[i] / total) * 100)}%` : ""}</div></div>
     </div>`).join("");
 }
 
 function reveal(m) {
-  stopTimer && stopTimer(); clearTimeout(question.hurry);
+  stopTimer && stopTimer(); clearTimeout(question.hurry); $("#qMedia").innerHTML = "";
   $("#rNum").textContent = `Question ${m.index + 1}`;
   $("#rTitle").textContent = m.text;
   $("#bars").innerHTML = barsHtml(m.answers, m.counts, m.correct);

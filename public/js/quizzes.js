@@ -2,7 +2,8 @@
 // Slide types: quiz, poll, wordcloud, open, scale, qa
 
 export const SLIDE_TYPES = [
-  { type: "quiz", mode: "play", label: "Quiz question", hint: "One right answer, timer and points" },
+  { type: "quiz", mode: "play", label: "Quiz question", hint: "2 to 4 answers, timer and points" },
+  { type: "truefalse", mode: "play", label: "True or false", hint: "Quick two-answer question" },
   { type: "poll", mode: "kural", label: "Poll", hint: "Live bar chart, no right answer" },
   { type: "wordcloud", mode: "kural", label: "Word cloud", hint: "Short words grow as more people send them" },
   { type: "open", mode: "kural", label: "Open question", hint: "Free-text answers shown as cards" },
@@ -40,7 +41,8 @@ export const DEMO_MEETING = {
 
 export function blankSlide(type = "quiz") {
   switch (type) {
-    case "quiz": return { type, text: "", answers: ["", "", "", ""], correct: 0, time: 20 };
+    case "quiz": return { type, text: "", answers: ["", "", "", ""], correct: [0], time: 20, points: 1 };
+    case "truefalse": return { type: "quiz", tf: true, text: "", answers: ["True", "False"], correct: [0], time: 15, points: 1 };
     case "poll": return { type, text: "", answers: ["", "", "", ""] };
     case "scale": return { type, text: "", statements: ["", ""], low: "Disagree", high: "Agree" };
     default: return { type, text: "" };

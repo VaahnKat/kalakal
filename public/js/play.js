@@ -128,6 +128,8 @@ function question(m) {
   currentQ = m.index;
   $("#qCount").textContent = `${m.index + 1} / ${m.total}`;
   $("#qText").textContent = m.text;
+  $("#qX2").hidden = !(m.points === 2 || m.points === 0);
+  $("#qX2").textContent = m.points === 2 ? "Double points!" : "Warm-up: no points";
   if (m.alreadyAnswered) { locked(null); return; }
   $("#pAnswers").innerHTML = m.answers.map((a, i) =>
     `<button class="answer a${i}" type="button" data-i="${i}">${SHAPES[i]}<span>${esc(a)}</span></button>`).join("");
@@ -167,7 +169,7 @@ function result(m) {
   el.innerHTML = `
     <div class="avw react-${react}">${avatarSvg(myAvatar, { size: 160, mood, label: "Your character" })}</div>
     <p class="big">${m.correct ? "Kalakal!" : m.answered ? "Not this time" : "Time's up"}</p>
-    ${m.correct ? `<p class="big" style="font-size:34px">+${m.points}</p>` : `<p style="font-weight:700;font-size:19px">Answer: ${esc(m.correctText)}</p>`}
+    ${m.correct && m.noPoints ? `<p style="font-weight:700;font-size:19px">Warm-up round: no points</p>` : m.correct ? `<p class="big" style="font-size:34px">+${m.points}</p>` : `<p style="font-weight:700;font-size:19px">Answer: ${esc(m.correctText)}</p>`}
     ${ms.map((k) => `<p class="milestone">${esc(milestoneText(k))}</p>`).join("")}
     ${streak}
     <p style="font-weight:800;font-size:20px">You're ${ordinal(m.rank)} of ${m.players} · ${m.score} pts</p>`;

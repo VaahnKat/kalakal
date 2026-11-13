@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "test": "node test/fun-test.mjs && node test/load-test.mjs && node test/engage-test.mjs",
+    "test": "node test/fun-test.mjs && node test/editor-test.mjs && node test/load-test.mjs && node test/engage-test.mjs",
     "loadtest": "node test/load-test.mjs",
     "mascots": "python3 tools/build_mascots.py"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
-  }
+  },
+  "type": "module"
 }

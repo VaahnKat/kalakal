@@ -90,10 +90,13 @@ function validateSession(q) {
       const answers = (Array.isArray(item.answers) ? item.answers : []).map((a) => clean(a, 80)).filter(Boolean);
       if (answers.length < 2 || answers.length > 4) return { error: `Slide ${n} needs 2 to 4 answers` };
       if (type === "quiz") {
-        const correct = Number(item.correct);
-        if (!Number.isInteger(correct) || correct < 0 || correct >= answers.length) return { error: `Slide ${n} has no correct answer` };
+        // correct: one index or a list of indexes (any of them counts as right)
+        const correct = [...new Set((Array.isArray(item.correct) ? item.correct : [item.correct]).map(Number))]
+          .filter((c) => Number.isInteger(c) && c >= 0 && c < answers.length).sort();
+        if (!correct.length) return { error: `Slide ${n} has no correct answer` };
         const time = Math.min(120, Math.max(5, Number(item.time) || 20));
-        slides.push({ type, text, answers, correct, time });
+        const points = [0, 1, 2].includes(Number(item.points)) ? Number(item.points) : 1;   // 0 = no points, 2 = double
+        slides.push({ type, text, answers, correct, time, points });
       } else slides.push({ type, text, answers });
     } else if (type === "scale") {
       const statements = (Array.isArray(item.statements) ? item.statements : []).map((s) => clean(s, 80)).filter(Boolean).slice(0, 4);
@@ -307,7 +310,7 @@ export class GameRoom extends DurableObject {
     const q = this.slides[i];
     this.phase = "question"; this.qStartedAt = Date.now();
     this.timer = setTimeout(() => this.reveal(), q.time * 1000 + 300);
-    const base = { t: "question", index: i, total: this.slides.length, text: q.text, answers: q.answers, time: q.time, remaining: q.time * 1000 };
+    const base = { t: "question", index: i, total: this.slides.length, text: q.text, answers: q.answers, time: q.time, points: q.points, remaining: q.time * 1000 };
     this.toHosts({ ...base, answered: 0, players: this.players.size });
     this.toPlayers(() => base);
   }
@@ -335,10 +338,11 @@ export class GameRoom extends DurableObject {
     for (const p of this.players.values()) {
       const a = p.answers[this.qIndex];
       if (a) counts[a.choice]++;
-      if (a && a.choice === q.correct) {
+      if (q.points === 0) { if (a) a.points = 0; continue; }   // warm-up question: no score, streak untouched
+      if (a && q.correct.includes(a.choice)) {
         const speed = 1 - a.elapsed / (q.time * 1000) / 2;
         p.streak += 1;
-        a.points = Math.round(1000 * speed) + Math.min(500, (p.streak - 1) * 100);
+        a.points = Math.round(1000 * speed) * q.points + Math.min(500, (p.streak - 1) * 100);
         p.score += a.points; p.correct++; p.best = Math.max(p.best, p.streak);
       } else { p.streak = 0; if (a) a.points = 0; }
     }
@@ -348,7 +352,7 @@ export class GameRoom extends DurableObject {
     const ms = new Map();
     ranked.forEach((p, idx) => {
       const rank = idx + 1, before = prevRank.get(p.id) || rank, list = [];
-      const a = p.answers[this.qIndex], right = !!a && a.choice === q.correct;
+      const a = p.answers[this.qIndex], right = q.points !== 0 && !!a && q.correct.includes(a.choice);
       if (right && (p.streak === 3 || p.streak === 5 || p.streak === 7 || (p.streak >= 10 && p.streak % 5 === 0))) list.push(`streak${p.streak}`);
       if (this.quizDone > 1 && p.score > 0) {
         if (rank === 1 && before !== 1 && ranked.length > 1) list.push("lead");
@@ -363,7 +367,7 @@ export class GameRoom extends DurableObject {
     this.toHosts({ t: "reveal", index: this.qIndex, correct: q.correct, counts, text: q.text, answers: q.answers, last: this.qIndex + 1 >= this.slides.length });
     ranked.forEach((p, idx) => {
       const a = p.answers[this.qIndex];
-      this.toPlayer(p, { t: "result", answered: !!a, correct: !!a && a.choice === q.correct, points: a ? a.points : 0, score: p.score, streak: p.streak, rank: idx + 1, players: ranked.length, correctText: q.answers[q.correct], milestones: (ms.get(p.id) || []).sort((x, y) => order(x) - order(y)) });
+      this.toPlayer(p, { t: "result", answered: !!a, correct: !!a && q.correct.includes(a.choice), noPoints: q.points === 0, points: a ? a.points : 0, score: p.score, streak: p.streak, rank: idx + 1, players: ranked.length, correctText: q.correct.map((c) => q.answers[c]).join(" / "), milestones: (ms.get(p.id) || []).sort((x, y) => order(x) - order(y)) });
     });
   }
 
@@ -385,7 +389,7 @@ export class GameRoom extends DurableObject {
     this.phase = "podium";
     const ranked = this.ranked();
     this.toHosts({ t: "podium", top: ranked.slice(0, 3).map((p) => ({ name: p.name, score: p.score, color: p.color, avatar: p.avatar })), players: ranked.length, results: ranked.map((p, i) => ({ rank: i + 1, name: p.name, score: p.score })), summary });
-    const quizCount = this.slides.filter((x) => x.type === "quiz").length;
+    const quizCount = this.slides.filter((x) => x.type === "quiz" && x.points !== 0).length;
     ranked.forEach((p, idx) => this.toPlayer(p, { t: "final", rank: idx + 1, score: p.score, players: ranked.length, perfect: quizCount > 1 && p.correct === quizCount, best: p.best }));
   }
 
@@ -507,7 +511,7 @@ export class GameRoom extends DurableObject {
     const snap = { t: "snapshot", pin: this.setup.pin, title: this.setup.quiz.title, total: this.slides.length, phase: this.phase, players, locked: this.locked, funNames: this.funNames, mode: this.hasQuiz ? "play" : "kural" };
     if (this.phase === "question") {
       const q = this.slide;
-      snap.question = { index: this.qIndex, text: q.text, answers: q.answers, time: q.time, remaining: Math.max(0, q.time * 1000 - (Date.now() - this.qStartedAt)), answered: [...this.players.values()].filter((p) => p.answers[this.qIndex]).length };
+      snap.question = { index: this.qIndex, text: q.text, answers: q.answers, time: q.time, points: q.points, remaining: Math.max(0, q.time * 1000 - (Date.now() - this.qStartedAt)), answered: [...this.players.values()].filter((p) => p.answers[this.qIndex]).length };
     }
     if (this.phase === "engage") snap.engage = { index: this.qIndex, total: this.slides.length, slide: this.slide, results: this.results(this.qIndex), players: players.length };
     return snap;
@@ -516,7 +520,7 @@ export class GameRoom extends DurableObject {
   playerSnapshot(p) {
     if (this.phase === "question") {
       const q = this.slide;
-      return { t: "question", index: this.qIndex, total: this.slides.length, text: q.text, answers: q.answers, time: q.time, remaining: Math.max(0, q.time * 1000 - (Date.now() - this.qStartedAt)), alreadyAnswered: !!p.answers[this.qIndex] };
+      return { t: "question", index: this.qIndex, total: this.slides.length, text: q.text, answers: q.answers, time: q.time, points: q.points, remaining: Math.max(0, q.time * 1000 - (Date.now() - this.qStartedAt)), alreadyAnswered: !!p.answers[this.qIndex] };
     }
     if (this.phase === "engage") return this.engageForPlayer(p);
     if (this.phase === "podium") { const ranked = this.ranked(); return { t: "final", rank: ranked.indexOf(p) + 1, score: p.score, players: ranked.length, best: p.best }; }

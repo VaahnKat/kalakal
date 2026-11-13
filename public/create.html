@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Create your own quiz · Kalakal</title>
+<meta name="description" content="Five easy ways to make your own Kalakal quiz: type or paste, build question by question, import a spreadsheet, use your AI chat, add pictures and videos.">
+<meta name="theme-color" content="#160B2A">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/img/icon.svg" type="image/svg+xml">
+<link rel="preload" href="/fonts/catamaran.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/unbounded.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/kalakal.css">
+<style>
+  .nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 0; flex-wrap: wrap; }
+  .hero { display: grid; grid-template-columns: 1.3fr .7fr; gap: 32px; align-items: center; padding: 28px 0 40px; }
+  .hero h1 { font-size: clamp(36px, 5vw, 60px); line-height: 1.05; }
+  .hero p.lead { font-size: 21px; max-width: 36rem; }
+  .hero .mascot { width: min(300px, 100%); justify-self: center; }
+  @media (max-width: 420px) { .ways { grid-template-columns: 1fr 1fr; } .way-card .tag { display: none; } }
+  @media (max-width: 760px) { .hero { grid-template-columns: 1fr; } .hero .mascot { width: 180px; order: -1; } }
+
+  .ways { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr)); gap: 14px; padding-bottom: 32px; }
+  .way-card { display: flex; flex-direction: column; gap: 6px; background: var(--night); border: 2px solid var(--line); border-radius: 18px; padding: 18px; color: var(--cream); text-decoration: none; transition: border-color .15s, transform .15s; }
+  .way-card:hover { border-color: var(--marigold); transform: translateY(-2px); color: var(--cream); }
+  .way-card .num { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; font: 800 18px var(--display); color: var(--ink); }
+  .way-card strong { font-size: 19px; }
+  .way-card span { color: var(--soft); font-size: 15px; }
+  .tag { align-self: flex-start; border-radius: 99px; padding: 2px 10px; font-size: 13px; font-weight: 800; color: var(--ink); background: var(--teal); }
+
+  .way { display: grid; grid-template-columns: .85fr 1.15fr; gap: 36px; align-items: center; padding: 44px 0; border-top: 1px solid var(--line); scroll-margin-top: 16px; }
+  .way:nth-of-type(even) .way-media { order: -1; }
+  @media (max-width: 900px) { .way { grid-template-columns: 1fr; } .way:nth-of-type(even) .way-media { order: 0; } }
+  .way h2 { font-size: clamp(28px, 3vw, 38px); line-height: 1.1; }
+  .way .pitch { font-size: 19px; }
+  .steps { counter-reset: s; list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+  .steps li { counter-increment: s; position: relative; padding: 3px 0 0 48px; min-height: 34px; font-size: 18px; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--marigold); color: var(--ink); font: 800 16px var(--display); }
+  .best { font-size: 16px; color: var(--soft); }
+  .best strong { color: var(--cream); }
+  .way-media { margin: 0; background: var(--night); border: 1px solid var(--line); border-radius: 22px; padding: 10px; box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+  .way-media img { display: block; width: 100%; height: auto; border-radius: 14px; aspect-ratio: 840 / 525; background: var(--ink); }
+  .way-media figcaption { font-size: 14px; color: var(--mist); padding: 8px 6px 2px; }
+
+  .cheat { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .cheat { grid-template-columns: 1fr; } }
+  pre.code { margin: 0; background: var(--ink); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; font: 15px/1.6 ui-monospace, Menlo, Consolas, monospace; color: var(--cream); white-space: pre-wrap; }
+  pre.code b { color: var(--teal); }
+  pre.code i { color: var(--mist); font-style: normal; }
+  table.ref { width: 100%; border-collapse: collapse; font-size: 16px; }
+  table.ref th, table.ref td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.ref th { color: var(--mist); font-weight: 700; }
+  table.ref code { color: var(--marigold); font-weight: 700; }
+
+  .faq { display: flex; flex-direction: column; gap: 10px; max-width: 900px; }
+  .faq details { background: var(--night); border: 1px solid var(--line); border-radius: 16px; padding: 0 20px; }
+  .faq details[open] { border-color: var(--mist); }
+  .faq summary { cursor: pointer; list-style: none; padding: 18px 34px 18px 0; font-weight: 800; font-size: 18px; position: relative; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: "+"; position: absolute; right: 0; top: 12px; font: 700 28px var(--display); color: var(--marigold); }
+  .faq details[open] summary::after { content: "–"; }
+  .faq .a { padding: 0 0 18px; font-size: 17px; color: var(--soft); display: flex; flex-direction: column; gap: 8px; }
+  .faq .a strong { color: var(--cream); }
+  .cta-end { text-align: center; padding: 56px 0 72px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  section.block { padding: 48px 0; border-top: 1px solid var(--line); scroll-margin-top: 16px; }
+  section.block h2 { font-size: clamp(28px, 3vw, 38px); margin-bottom: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav">
+    <a class="brand" href="/"><img src="/img/icon.svg" alt="">kalakal</a>
+    <div class="row"><a class="btn btn-ghost btn-sm" href="#faq">FAQ</a><a class="btn btn-primary btn-sm" href="/host.html?build=play">Open the quiz builder</a></div>
+  </nav>
+
+  <header class="hero">
+    <div class="stack" style="gap: 18px">
+      <p class="eyebrow">Create your own quiz</p>
+      <h1>Your own quiz, ready in a minute.</h1>
+      <p class="muted lead">Type it, paste it, bring a spreadsheet or let your AI chat write the first draft. Add pictures, GIFs and videos. Free, no account needed.</p>
+      <div class="row">
+        <a class="btn btn-primary" href="/host.html?build=play">Start a quiz</a>
+        <a class="btn btn-ghost" href="/host.html?build=kural">Make polls &amp; feedback instead</a>
+      </div>
+    </div>
+    <img class="mascot float" src="/img/mascots/explorer.webp" alt="" width="300" height="315">
+  </header>
+
+  <nav class="ways" aria-label="Ways to create a quiz">
+    <a class="way-card" href="#paste"><span class="num" style="background: var(--marigold)">1</span><strong>Type or paste</strong><span>Write a whole quiz like a text message</span><span class="tag">Fastest</span></a>
+    <a class="way-card" href="#editor"><span class="num" style="background: var(--teal)">2</span><strong>Question by question</strong><span>Fill in boxes, tap the right answer</span></a>
+    <a class="way-card" href="#spreadsheet"><span class="num" style="background: var(--coral)">3</span><strong>From a spreadsheet</strong><span>Excel, Google Sheets or a CSV file</span></a>
+    <a class="way-card" href="#ai"><span class="num" style="background: var(--lilac)">4</span><strong>With your AI chat</strong><span>ChatGPT, Claude or Gemini writes a draft</span></a>
+    <a class="way-card" href="#media"><span class="num" style="background: var(--cream)">5</span><strong>Pictures &amp; videos</strong><span>Images, GIFs and YouTube clips</span></a>
+  </nav>
+
+  <section class="way" id="paste">
+    <div class="stack" style="gap: 16px">
+      <p class="eyebrow">Way 1 · Fastest</p>
+      <h2>Type or paste your questions</h2>
+      <p class="muted pitch">Write the quiz as plain text: the question, then the answers. A star marks the right one. Kalakal shows a live preview as you type.</p>
+      <ol class="steps">
+        <li>Open the quiz builder and press <strong>Paste or type questions</strong>.</li>
+        <li>Type a question, then each answer on its own line. Put <strong>*</strong> before the right answer and <strong>-</strong> before the others.</li>
+        <li>Leave one empty line before the next question.</li>
+        <li>Check the preview on the right and press <strong>Add to quiz</strong>.</li>
+      </ol>
+      <p class="best"><strong>Best for:</strong> quizzes you already have in Word, Notes, WhatsApp or an email.</p>
+      <div class="row"><a class="btn btn-primary btn-sm" href="/host.html?build=play&amp;paste=1">Try it now</a><a class="muted" href="#cheat" style="font-weight: 700">See the format</a></div>
+    </div>
+    <figure class="way-media">
+      <picture><source srcset="/img/guide/paste.webp" media="(prefers-reduced-motion: reduce)"><img src="/img/guide/paste.gif" alt="Animation: pressing Paste or type questions, typing three questions with stars on the right answers, the live preview filling in, and pressing Add to quiz." width="840" height="525" loading="lazy"></picture>
+      <figcaption>Typing three questions and adding them in one go.</figcaption>
+    </figure>
+  </section>
+
+  <section class="way" id="editor">
+    <div class="stack" style="gap: 16px">
+      <p class="eyebrow">Way 2</p>
+      <h2>Build it question by question</h2>
+      <p class="muted pitch">The classic way, made quick: you can do almost everything from the keyboard.</p>
+      <ol class="steps">
+        <li>Type the question and press <strong>Enter</strong> to jump to the answers.</li>
+        <li>Type each answer, pressing Enter after each one. Enter on the last answer starts a new question.</li>
+        <li>Tap <strong>Right</strong> on the correct answer. Tap more than one if several answers are right.</li>
+        <li>Choose the time and the points: <strong>Normal</strong>, <strong>Double</strong> for a bonus round, or <strong>No points</strong> for a warm-up.</li>
+        <li>Press <strong>Create game</strong>. The PIN and QR code appear for your players.</li>
+      </ol>
+      <p class="best"><strong>Best for:</strong> new quizzes, and fine-tuning questions you pasted or imported.</p>
+      <div class="row"><a class="btn btn-primary btn-sm" href="/host.html?build=play">Open the builder</a></div>
+    </div>
+    <figure class="way-media">
+      <picture><source srcset="/img/guide/editor.webp" media="(prefers-reduced-motion: reduce)"><img src="/img/guide/editor.gif" alt="Animation: typing a question and four answers, tapping Right on the correct answer, choosing double points and creating the game, which shows the PIN." width="840" height="525" loading="lazy"></picture>
+      <figcaption>From empty card to a game PIN in about 15 seconds.</figcaption>
+    </figure>
+  </section>
+
+  <section class="way" id="spreadsheet">
+    <div class="stack" style="gap: 16px">
+      <p class="eyebrow">Way 3</p>
+      <h2>Bring a spreadsheet</h2>
+      <p class="muted pitch">Keep your question bank in Excel, Google Sheets, Numbers or LibreOffice and bring it in whenever you need it.</p>
+      <ol class="steps">
+        <li><a href="/templates/kalakal-quiz-template.csv" download>Download the template</a> and open it in your spreadsheet app.</li>
+        <li>One question per row. In <strong>Correct</strong> write the number of the right answer (1–4), or several like <strong>1,3</strong>.</li>
+        <li>Select the rows, copy, and paste them into <strong>Paste or type questions</strong>. Or save as CSV and use <strong>Import spreadsheet</strong>.</li>
+        <li>To keep a copy or share it, use <strong>Export as spreadsheet</strong>.</li>
+      </ol>
+      <p class="best"><strong>Best for:</strong> teachers, big question banks, and teams who write quizzes together in a shared sheet.</p>
+      <div class="row"><a class="btn btn-primary btn-sm" href="/templates/kalakal-quiz-template.csv" download>Download template</a><a class="muted" href="#columns" style="font-weight: 700">Column guide</a></div>
+    </div>
+    <figure class="way-media">
+      <picture><source srcset="/img/guide/spreadsheet.webp" media="(prefers-reduced-motion: reduce)"><img src="/img/guide/spreadsheet.gif" alt="Animation: rows selected in a spreadsheet, copied, pasted into Kalakal's paste box, previewed and added as four slides." width="840" height="525" loading="lazy"></picture>
+      <figcaption>Copy rows from any spreadsheet app and paste them in.</figcaption>
+    </figure>
+  </section>
+
+  <section class="way" id="ai">
+    <div class="stack" style="gap: 16px">
+      <p class="eyebrow">Way 4</p>
+      <h2>Let your AI chat write a draft</h2>
+      <p class="muted pitch">Kalakal gives you a ready-made prompt. Your AI writes the questions in exactly the format Kalakal reads.</p>
+      <ol class="steps">
+        <li>Open <strong>Paste or type questions</strong> and press <strong>Copy AI prompt</strong>.</li>
+        <li>Paste it into ChatGPT, Claude, Gemini or any AI chat. Change the topic, audience and number of questions.</li>
+        <li>Copy the AI's reply and paste it back into Kalakal.</li>
+        <li><strong>Check every answer</strong> in the preview: AI can be confidently wrong. Then press Add to quiz.</li>
+      </ol>
+      <p class="best"><strong>Best for:</strong> a quick first draft on any topic. A built-in AI generator is coming next.</p>
+      <div class="row"><a class="btn btn-primary btn-sm" href="/host.html?build=play&amp;paste=1">Get the prompt</a></div>
+    </div>
+    <figure class="way-media">
+      <picture><source srcset="/img/guide/ai.webp" media="(prefers-reduced-motion: reduce)"><img src="/img/guide/ai.gif" alt="Animation: pressing Copy AI prompt, an AI chat replying with three questions in Kalakal's format, and the reply pasted back into Kalakal and added." width="840" height="525" loading="lazy"></picture>
+      <figcaption>Prompt out, questions back, checked and added.</figcaption>
+    </figure>
+  </section>
+
+  <section class="way" id="media">
+    <div class="stack" style="gap: 16px">
+      <p class="eyebrow">Way 5</p>
+      <h2>Add pictures, GIFs and videos</h2>
+      <p class="muted pitch">Make questions visual: guess the place, name the actor, or play a clip and ask what happens next.</p>
+      <ol class="steps">
+        <li>On a quiz question, press <strong>Add picture</strong>. You can also drag a picture onto the question, or paste one with Ctrl/Cmd + V.</li>
+        <li>For a GIF or an online picture, paste its link into the link box.</li>
+        <li>For a video, paste a <strong>YouTube</strong> link and set the start and end time, so only the part you want plays.</li>
+        <li>The picture or video shows on the big screen. Phones just show the answer buttons, so they stay fast on busy Wi-Fi.</li>
+      </ol>
+      <p class="best"><strong>Good to know:</strong> big photos are shrunk automatically. Use pictures you took yourself or are allowed to use.</p>
+      <div class="row"><a class="btn btn-primary btn-sm" href="/host.html?build=play">Add a picture question</a></div>
+    </div>
+    <figure class="way-media">
+      <picture><source srcset="/img/guide/media.webp" media="(prefers-reduced-motion: reduce)"><img src="/img/guide/media.gif" alt="Animation: adding a picture to a question, pasting a YouTube link with start and end times, and the picture showing on the big screen during the game." width="840" height="525" loading="lazy"></picture>
+      <figcaption>Picture on the question, then on the big screen.</figcaption>
+    </figure>
+  </section>
+
+  <section class="block" id="cheat">
+    <h2>Quick-type cheat sheet</h2>
+    <div class="cheat">
+      <pre class="code">What is the capital of Sweden?
+<b>*</b> Stockholm
+<i>-</i> Gothenburg
+<i>-</i> Malmö
+<i>time: 30</i>
+<i>points: double</i>
+
+Which are Tamil festivals?
+<b>*</b> Pongal
+<i>-</i> Midsummer
+<b>*</b> Diwali
+
+Best snack for the break?
+<i>-</i> Samosa
+<i>-</i> Kanelbulle</pre>
+      <table class="ref">
+        <tr><th>Write</th><th>What it does</th></tr>
+        <tr><td><code>*</code> before an answer</td><td>Marks a right answer. Use it on several answers if several are right.</td></tr>
+        <tr><td><code>-</code> before an answer</td><td>A wrong answer. 2 to 4 answers per question.</td></tr>
+        <tr><td>An empty line</td><td>Starts the next question.</td></tr>
+        <tr><td>No <code>*</code> at all</td><td>Makes a poll: everyone votes, no right answer.</td></tr>
+        <tr><td><code>True</code> / <code>False</code></td><td>Two answers named True and False become a true-or-false question.</td></tr>
+        <tr><td><code>time: 30</code></td><td>Seconds to answer: 10, 15, 20, 30, 45 or 60.</td></tr>
+        <tr><td><code>points: double</code></td><td>Double points. <code>points: none</code> makes a warm-up question.</td></tr>
+        <tr><td><code>image: link</code></td><td>Shows a picture or GIF from the web.</td></tr>
+        <tr><td><code>video: link</code></td><td>Plays a YouTube video. Add <code>?t=30</code> to the link to start at 0:30.</td></tr>
+        <tr><td><code>a)</code> <code>1.</code> <code>Q1:</code></td><td>Numbering and letters are tidied away for you.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section class="block" id="columns">
+    <h2>Spreadsheet columns</h2>
+    <table class="ref">
+      <tr><th>Column</th><th>What to put in it</th><th>Example</th></tr>
+      <tr><td><code>Type</code></td><td>Quiz, True or false, or Poll. Can be left empty for quiz questions.</td><td>Quiz</td></tr>
+      <tr><td><code>Question</code></td><td>The question, up to 200 characters.</td><td>Capital of Norway?</td></tr>
+      <tr><td><code>Answer 1</code> to <code>Answer 4</code></td><td>2 to 4 answers, up to 80 characters each.</td><td>Oslo</td></tr>
+      <tr><td><code>Correct</code></td><td>Number(s) or letter(s) of the right answer, or the answer text.</td><td>1 · 1,3 · B · Oslo</td></tr>
+      <tr><td><code>Time</code></td><td>Seconds (optional, 20 if empty).</td><td>30</td></tr>
+      <tr><td><code>Points</code></td><td>normal, double or none (optional).</td><td>double</td></tr>
+      <tr><td><code>Image link</code></td><td>A web link to a picture or GIF (optional).</td><td>https://…/photo.jpg</td></tr>
+      <tr><td><code>YouTube link</code></td><td>A YouTube link (optional).</td><td>https://youtu.be/…?t=30</td></tr>
+    </table>
+  </section>
+
+  <section class="block" id="faq">
+    <h2>Questions people ask</h2>
+    <div class="faq">
+      <details><summary>Do I need an account?</summary><div class="a"><p>No. Your quiz is saved as a draft in this browser while you work. To keep a copy, move it to another computer or share it with a friend, press <strong>Export as spreadsheet</strong>, then import it there. Saved quiz libraries with sign-in are coming.</p></div></details>
+      <details><summary>Where is my quiz saved, and can I lose it?</summary><div class="a"><p>Drafts are stored in your browser on this device. They stay when you close the tab, but clearing your browser data or using a private window removes them. Export important quizzes as a spreadsheet to be safe.</p></div></details>
+      <details><summary>How many questions and answers can a quiz have?</summary><div class="a"><p>Up to <strong>50 slides</strong> per session. Each quiz question has <strong>2 to 4 answers</strong> and <strong>10 to 60 seconds</strong> to answer. Questions can be up to 200 characters and answers up to 80.</p></div></details>
+      <details><summary>Can more than one answer be right?</summary><div class="a"><p>Yes. Tap <strong>Right</strong> on every correct answer, or use <strong>*</strong> on several lines. Players pick one answer, and any of the right ones scores. The big screen highlights all of them at the reveal.</p></div></details>
+      <details><summary>How do points work? What are Double and No points?</summary><div class="a"><p>A right answer scores <strong>500 to 1,000 points</strong>: the faster, the more. Answering in a row adds a streak bonus of up to +500. <strong>Double</strong> doubles the speed points, which is great for a final round. <strong>No points</strong> makes a warm-up question: players answer and see if they were right, but scores and streaks don't change.</p></div></details>
+      <details><summary>What can I add: pictures, GIFs, videos?</summary><div class="a">
+        <p><strong>Pictures:</strong> upload, drag or paste JPG, PNG or WebP. Big photos are shrunk automatically so they load fast.</p>
+        <p><strong>GIFs:</strong> upload one up to 1.5 MB, or paste a link to a GIF online.</p>
+        <p><strong>Videos:</strong> paste a YouTube link and choose the start and end. Uploading your own video files isn't possible yet.</p>
+        <p>Pictures and videos show on the big screen. Phones show the answer buttons, which keeps the game fast for everyone.</p></div></details>
+      <details><summary>Can AI write my quiz?</summary><div class="a"><p>Yes, with any AI chat you already use. Press <strong>Copy AI prompt</strong> in the paste window, paste it into ChatGPT, Claude or Gemini, change the topic, and paste the reply back. Always check the answers: AI sometimes gets facts wrong. A built-in generator is coming next.</p></div></details>
+      <details><summary>Which spreadsheet apps work?</summary><div class="a"><p>Any of them: Excel, Google Sheets, Apple Numbers or LibreOffice. The quickest way is to select the rows, copy and paste them into <strong>Paste or type questions</strong>. To import a file, save it as <strong>CSV</strong> first (in Google Sheets: File → Download → CSV). The <a href="#columns">column guide</a> lists what goes where.</p></div></details>
+      <details><summary>Can I write questions in Tamil, Swedish or other languages?</summary><div class="a"><p>Yes, any language, and you can mix languages in one quiz. Tamil script is fully supported on the big screen and on phones.</p></div></details>
+      <details><summary>Can I mix polls, word clouds and Q&amp;A into a quiz?</summary><div class="a"><p>Yes. In the builder, under <strong>Add a slide</strong>, you can add polls, word clouds, open questions, 1–5 scales and Q&amp;A between quiz questions. They don't affect the scores.</p></div></details>
+      <details><summary>How many people can play?</summary><div class="a"><p>Up to <strong>200 players</strong> per game. They join on their phones with the PIN or QR code. No app needed.</p></div></details>
+      <details><summary>Is it free?</summary><div class="a"><p>Yes. Creating and hosting quizzes is free. Extras for schools, companies and big events may come later; the free version stays.</p></div></details>
+      <details><summary>Something isn't working. What should I check?</summary><div class="a">
+        <p><strong>"Needs at least 2 answers":</strong> every question needs two or more answers, each on its own line.</p>
+        <p><strong>"Say which answer is right":</strong> mark one with <strong>*</strong>, tap Right, or fill the Correct column.</p>
+        <p><strong>"Too big to save in this browser":</strong> you've uploaded many large pictures. Use picture links for some questions instead.</p>
+        <p><strong>Excel file won't import:</strong> save it as CSV first, or copy and paste the rows.</p></div></details>
+    </div>
+  </section>
+
+  <section class="cta-end">
+    <img class="mascot float" src="/img/mascots/host-happy.webp" alt="" width="120" height="170">
+    <h2 style="font-size: clamp(30px, 3.4vw, 44px)">Ready? Make it Kalakal.</h2>
+    <div class="row" style="justify-content: center"><a class="btn btn-primary" href="/host.html?build=play">Start a quiz</a><a class="btn btn-ghost" href="/host.html">Play a ready-made quiz</a></div>
+  </section>
+</div>
+</body>
+</html>

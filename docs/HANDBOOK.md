@@ -1,7 +1,7 @@
 # Kalakal Handbook
 
 The one document that explains what Kalakal is, how it is built, and how to change it.
-Version 0.4 · November 2026 · Owner: Prabha
+Version 0.5 · November 2026 · Owner: Prabha
 
 **Live site:** https://kalakal.prabhuwinz17.workers.dev
 **Code:** https://github.com/VaahnKat/kalakal (branch `main` deploys automatically)
@@ -56,6 +56,7 @@ kalakal/
 │   ├── index.html            Home page with "Join a game"
 │   ├── host.html             Host: choose mode, build, lobby, big-screen game
 │   ├── play.html             Player's phone screens
+│   ├── create.html           "Create your own quiz" guide: 5 ways, step GIFs, FAQ
 │   ├── avatars.html          Gallery of mascots and player characters
 │   ├── css/kalakal.css       All styles and brand tokens (colours, fonts, animations)
 │   ├── js/
@@ -64,15 +65,19 @@ kalakal/
 │   │   ├── common.js         Shared helpers: connection, timer, confetti, shapes
 │   │   ├── avatar.js         Player character builder (SVG), shared with the server
 │   │   ├── names.js          Fun-name generator, shared with the server
-│   │   └── quizzes.js        Slide types and the two ready-made sessions
-│   ├── img/                  Logo, icon, mascots (web-ready WebP)
+│   │   ├── quizzes.js        Slide types and the two ready-made sessions
+│   │   ├── quicktype.js      Quick-type text + spreadsheet import/export, AI prompt
+│   │   └── media.js          Picture compression, YouTube embeds
+│   ├── img/                  Logo, icon, mascots, guide/ (step GIFs)
+│   ├── templates/            Downloadable spreadsheet template (CSV)
 │   ├── fonts/                Self-hosted Unbounded + Catamaran (Tamil support)
 │   └── vendor/qrcode.js      QR code library (MIT)
 ├── design/                   Original artwork (not served to users)
 │   ├── logo/                 Logo and icon SVG masters
 │   └── mascots/source/       Full-size mascot PNGs + expression sheet
 ├── tools/
-│   └── build_mascots.py      Rebuilds public/img/mascots/*.webp from design/mascots/source
+│   ├── build_mascots.py      Rebuilds public/img/mascots/*.webp from design/mascots/source
+│   └── record_guides.py      Re-records the step GIFs on create.html
 ├── test/                     Automated tests (bots and screenshots)
 ├── wrangler.jsonc            Cloudflare configuration
 └── package.json              Scripts: dev, deploy, test, mascots
@@ -150,6 +155,19 @@ Each recipe says which file to open and what to change. After any change: test l
 | Add or remove fun names | `public/js/names.js` | `TITLES` and `THINGS` lists (names are combined; keep each result ≤ 16 characters) |
 | Block more words | `src/index.js` | `BLOCKED` list |
 
+### Quiz creation (editor, quick-type, spreadsheet)
+
+| I want to… | Open | Change |
+|---|---|---|
+| Change the quick-type format (`*`, `-`, `time:`…) | `public/js/quicktype.js` | `parseText`; update the cheat sheet in `public/create.html` too |
+| Change spreadsheet columns | `public/js/quicktype.js` | `COLUMNS`, `parseRows`, `TEMPLATE_CSV`; then regenerate `public/templates/kalakal-quiz-template.csv` |
+| Change the AI prompt | `public/js/quicktype.js` | `aiPrompt` |
+| Change picture size limits | `public/js/media.js` | `MAX_SIDE`, `TARGET_BYTES`, GIF limit in `compressImage` |
+| Edit the guide page or FAQ | `public/create.html` | Plain HTML; each way is a `<section class="way">`, each FAQ a `<details>` |
+| Re-record the step GIFs after a UI change | `tools/record_guides.py` | `npm run dev`, then `npm run guides` (or `python3 tools/record_guides.py paste` for one) |
+
+How pictures work today: uploads are shrunk in the browser and saved with the draft (browser storage, ~5 MB in total). During a game they stay in the host's tab and show on the big screen only; phones get just the answers. Server storage (Cloudflare R2) comes with accounts.
+
 ### Rules and limits (all in `src/index.js`, top of file)
 
 | Setting | Constant | Today |
@@ -159,7 +177,7 @@ Each recipe says which file to open and what to change. After any change: test l
 | Nickname length | `NAME_MAX` | 16 |
 | Answers per person (word cloud, open, Q&A) | `LIMITS` | 3, 3, 5 |
 | Text length | `TEXT_MAX` | 25 / 200 / 200 |
-| Speed points and streak bonus | search `a.points =` | 500–1,000 + up to 500 |
+| Speed points and streak bonus | search `a.points =` | 500–1,000 (× 2 on Double, 0 on No points) + up to 500 |
 
 ### Look and feel
 
@@ -272,7 +290,7 @@ Host in one tab, join in another tab or from a phone on the same Wi-Fi (use the 
 ### Tests (run while `npm run dev` is running)
 
 ```bash
-npm test                                     # characters, names, milestones + quiz + Kural bots
+npm test                                     # characters, names, milestones, question features, quiz + Kural bots
 node test/load-test.mjs http://localhost:8787 150   # 150 simulated players
 python3 test/screens.py                      # screenshots (needs Playwright + Chrome)
 ```
@@ -302,6 +320,8 @@ Cloudflare → Workers & Pages → kalakal → Deployments → choose an earlier
 
 **Scoring (Play):** correct answers score 500–1,000 points by speed: `1000 × (1 − time used ÷ time allowed ÷ 2)`. Streak bonus: +100 for each correct answer in a row after the first, up to +500. Wrong or no answer: 0 and the streak resets.
 
+**Question options:** several answers can be marked right (any one of them scores; the reveal highlights all). Points per question: Normal, Double (speed points × 2) or No points (warm-up: no score, streak unchanged, not counted for "perfect game"). True or false is a quiz question with two answers.
+
 **Milestones** (animated on phones, pop-ups on the big screen): on fire at 3, 5, 7, 10 in a row (then every 5) · took the lead · entered the top 3 · comeback · perfect game. Rank-based milestones start after the first question.
 
 **Kural:** anonymous on screen. Poll votes can be changed. Word cloud merges the same word in any case. Q&A upvotes toggle and you cannot upvote your own question. The host can hide any text and mark questions answered.
@@ -323,12 +343,13 @@ Cloudflare → Workers & Pages → kalakal → Deployments → choose an earlier
 
 **Next (suggested order)**
 
-1. Sound effects and music (with a mute button).
-2. Team / house battles (Vizha mode).
-3. Image questions and true/false.
-4. Accounts and a saved quiz library (start of the paid tier).
-5. Redraw player characters in the 3D-sticker mascot style.
-6. Mobile app (wraps the same web app).
+1. Built-in AI quiz generator (topic, pasted text, PDF) with a daily free limit.
+2. Sound effects and music (with a mute button).
+3. Accounts, saved quiz library, template gallery; pictures stored in R2 so phones can show them too.
+4. Team / house battles (Vizha mode).
+5. GIF search, picture reveal effects, co-editing, audience-submitted questions.
+6. Redraw player characters in the 3D-sticker mascot style.
+7. Mobile app (wraps the same web app).
 
 ---
 

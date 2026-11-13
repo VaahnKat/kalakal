@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5 — 13 Nov 2026
+- "Create your own quiz" page (`/create.html`), linked from the home page: five ways to create, each with a step-by-step GIF, a quick-type cheat sheet, spreadsheet column guide and FAQ
+- Paste or type questions: plain-text format (`*` right, `-` wrong) with live preview; also accepts rows copied from Excel / Google Sheets
+- Spreadsheet: downloadable template, CSV import, export as spreadsheet
+- Copy AI prompt for ChatGPT, Claude or Gemini; the reply pastes straight back in
+- Editor: tap Right to mark answers (several allowed), Enter to move to the next box, duplicate, Normal / Double / No points per question, True or false questions
+- Pictures (upload, drag, paste, link, GIF) and YouTube clips with start/end on the big screen
+- `test/editor-test.mjs`, `tools/record_guides.py`
+
 ## 0.4 — 13 Nov 2026
 - Mascot expressions on the big screen: the Host thinks during a question, gasps in the last 5 seconds and cheers on the reveal; the Explorer thinks while a Kural slide waits for answers
 - Illustrated crew (Quiz-show Host, Sparkle Explorer, Arcade Champion) on the home page, mode cards, lobby, podium and end screen

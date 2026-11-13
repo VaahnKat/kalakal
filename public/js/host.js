@@ -569,4 +569,7 @@ function message(title, text, mood, withNext = false) {
   show("message");
 }
 
-if (pin) openGame(); else show("setup");
+const build = params.get("build");
+if (pin) openGame();
+else if (build === "play" || build === "kural") { openBuilder(build); if (params.get("paste")) $("#openPaste").click(); }
+else show("setup");

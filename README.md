@@ -2,7 +2,7 @@
 
 Live quizzes and audience interaction anyone can join with a PIN. Host on a big screen, play on phones. No app, no account.
 
-**Live:** https://kalakal.prabhuwinz17.workers.dev · **Version:** 0.4 · **Full documentation:** [docs/HANDBOOK.md](docs/HANDBOOK.md)
+**Live:** https://kalakal.prabhuwinz17.workers.dev · **Version:** 0.5 · **Full documentation:** [docs/HANDBOOK.md](docs/HANDBOOK.md)
 
 | Mode | Like | What players do |
 |---|---|---|
@@ -10,6 +10,8 @@ Live quizzes and audience interaction anyone can join with a PIN. Host on a big 
 | **Kalakal Kural** | Mentimeter | Polls, word clouds, open questions, 1–5 scales and live Q&A, anonymously |
 
 Every player gets a character (2,800 looks), can take a fun name like *Captain Dosa*, and sees animated reactions for streaks, taking the lead and reaching the top 3.
+
+Hosts can create quizzes by typing or pasting plain text, importing a spreadsheet, using their own AI chat, or question by question with pictures and YouTube clips. See `/create.html`.
 
 ## Quick start
 

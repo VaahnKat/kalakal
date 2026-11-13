@@ -1,6 +1,6 @@
 {
   "name": "kalakal",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "Kalakal - live quizzes, polls and games anyone can join with a PIN",
   "scripts": {
@@ -8,7 +8,8 @@
     "deploy": "wrangler deploy",
     "test": "node test/fun-test.mjs && node test/editor-test.mjs && node test/load-test.mjs && node test/engage-test.mjs",
     "loadtest": "node test/load-test.mjs",
-    "mascots": "python3 tools/build_mascots.py"
+    "mascots": "python3 tools/build_mascots.py",
+    "guides": "python3 tools/record_guides.py"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"

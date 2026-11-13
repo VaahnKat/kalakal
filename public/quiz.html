@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiz · Kalakal</title>
+<meta property="og:title" content="A Kalakal quiz">
+<meta property="og:description" content="Host this quiz for free. Players join with a PIN on their phones.">
+<meta property="og:image" content="https://kalakal.se/img/og-kalakal.png">
+<meta name="theme-color" content="#160B2A">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/img/icon.svg" type="image/svg+xml">
+<link rel="preload" href="/fonts/catamaran.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/unbounded.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/kalakal.css">
+<style>
+  .qd { display: grid; grid-template-columns: 1.1fr .9fr; gap: 36px; align-items: start; padding: 12px 0 24px; }
+  @media (max-width: 860px) { .qd { grid-template-columns: 1fr; } }
+  .qd h1 { font-size: clamp(30px, 4vw, 48px); }
+  .qd .q-cover { border-radius: 22px; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+  .fact { background: var(--night); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+  .fact b { display: block; font: 800 22px var(--display); }
+  .fact span { color: var(--soft); font-size: 14px; }
+  .preview { display: flex; flex-direction: column; gap: 8px; }
+  .preview li { background: var(--night); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; list-style: none; }
+  .preview ol { padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+  .like[aria-pressed="true"] { background: var(--coral); border-color: var(--coral); color: var(--ink); }
+  dialog.rep { width: min(520px, 94vw); background: var(--night); color: var(--cream); border: 1px solid var(--line); border-radius: 20px; padding: 24px; }
+  dialog.rep::backdrop { background: rgba(10,4,22,.75); }
+  .rep label.opt { display: flex; gap: 10px; align-items: center; padding: 6px 0; font-weight: 700; }
+  .rep textarea { width: 100%; min-height: 90px; background: var(--ink); color: var(--cream); border: 2px solid var(--line); border-radius: 12px; padding: 10px; font: 16px var(--body); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div data-nav></div>
+  <main id="main"><p class="muted" style="padding: 40px 0">Loading…</p></main>
+  <footer data-foot></footer>
+</div>
+<dialog class="rep" id="repDlg" aria-labelledby="repTitle">
+  <form method="dialog" class="stack" id="repForm">
+    <h2 id="repTitle" style="font-size: 24px">Report this quiz</h2>
+    <p class="muted">Tell us what's wrong. Reports are anonymous to the creator.</p>
+    <div>
+      <label class="opt"><input type="radio" name="reason" value="wrong" checked> Wrong answers or misleading</label>
+      <label class="opt"><input type="radio" name="reason" value="offensive"> Offensive or unsuitable</label>
+      <label class="opt"><input type="radio" name="reason" value="copyright"> Uses my work without permission</label>
+      <label class="opt"><input type="radio" name="reason" value="spam"> Spam or advertising</label>
+      <label class="opt"><input type="radio" name="reason" value="other"> Something else</label>
+    </div>
+    <textarea id="repNote" maxlength="500" placeholder="Details (optional)" aria-label="Details"></textarea>
+    <div class="row" style="justify-content: flex-end"><button class="btn btn-ghost btn-sm" value="cancel" type="submit" formnovalidate>Cancel</button><button class="btn btn-primary btn-sm" type="button" id="repSend">Send report</button></div>
+  </form>
+</dialog>
+<script type="module" src="/js/quiz-page.js"></script>
+</body>
+</html>

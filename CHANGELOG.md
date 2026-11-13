@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7 — 14 Nov 2026
+- **Accounts:** Sign in with Google; welcome step (display name, 13+, terms); My quizzes (host, edit, page, duplicate, delete); download my data; delete account
+- **Save & share** in the editor: description, category, language, age group; Private / Unlisted / Public; Save to My quizzes; open saved quizzes for editing
+- **Quiz library** (`/library.html`): search, 12 categories, language and age filters, Popular / Trending / Newest / Top rated; quiz pages with Host this quiz, Copy and edit, Like, Share, Report (answers never shown); creator pages; Popular this week on the home page
+- **Moderation:** blocked words, AI safety check, a new creator's first public quiz waits for approval, 3 reports hide a quiz; admin page with approvals, reports and numbers
+- **Pictures on phones** for saved quizzes (R2 storage, once switched on)
+- **Security & professionalism:** Content-Security-Policy and security headers, cross-site request check, inline scripts removed, privacy policy and terms, site menu and footer, link-preview image
+- Plays counted per quiz (finished games with 3+ players); `test/accounts-test.mjs`
+
 ## 0.6.1 — 13 Nov 2026
 - Edit questions and right answers everywhere: AI review (tap an answer to mark it right, Edit to change wording), and **Edit questions** in the lobby for a created game (same PIN, players stay; locked once the game starts)
 - "Edit first" links for the ready-made quiz and meeting warm-up

@@ -4,6 +4,7 @@ import { avatarSvg } from "/js/avatar.js";
 import { parseQuick, parseSpreadsheetFile, toCSV, TEMPLATE_CSV, aiPrompt, mediaFromLink } from "/js/quicktype.js";
 import { compressImage, ytThumb, mediaHtml, parseTime, fmtTime } from "/js/media.js";
 import { initAi } from "/js/ai-ui.js";
+import { me, api, signIn, mountNav } from "/js/account.js";
 
 const params = new URLSearchParams(location.search);
 let pin = (params.get("pin") || "").replace(/\D/g, "");
@@ -40,7 +41,7 @@ let currentQuiz = null;    // the quiz the server has for this game
 let pendingMedia = null;
 const draftKey = () => (editingPin ? "kalakal:draft:game:" + editingPin : "kalakal:draft:" + builderMode);
 function saveDraft() {
-  try { localStorage.setItem(draftKey(), JSON.stringify(draft)); $("#draftNote").textContent = "Draft saved in this browser"; }
+  try { localStorage.setItem(draftKey(), JSON.stringify(draft)); $("#draftNote").textContent = draft.id ? "Draft kept in this browser · press Save to My quizzes to update your saved quiz" : "Draft saved in this browser"; }
   catch { $("#draftNote").textContent = "Too big to save in this browser: use picture links instead of uploads for some questions."; }
 }
 // Older drafts stored one correct answer as a number
@@ -62,7 +63,7 @@ function quizToDraft(quiz, media = []) {
         const tf = q.answers.length === 2 && /^true$/i.test(q.answers[0]) && /^false$/i.test(q.answers[1]);
         const out = { type: "quiz", text: q.text, answers: tf ? q.answers.slice() : [...q.answers, "", "", ""].slice(0, 4), correct: (Array.isArray(q.correct) ? q.correct : [q.correct]).slice(), time: q.time || 20, points: q.points ?? 1 };
         if (tf) out.tf = true;
-        if (media[i]) out.media = media[i];
+        if (media[i] || q.media) out.media = media[i] || q.media;
         return out;
       }
       if (q.type === "poll") return { type: "poll", text: q.text, answers: [...q.answers, "", "", ""].slice(0, 4) };
@@ -86,6 +87,7 @@ function openBuilder(mode, preset = null) {
   $("#builderHint").textContent = mode === "play" ? "Players score points for right, fast answers." : "No scores: answers show live and anonymously.";
   $("#quizTitle").placeholder = mode === "play" ? "Friday team quiz" : "Monday team check-in";
   $("#openAi").hidden = mode !== "play";
+  renderMeta();
   const group = (m, label) => `<div class="stack" style="gap:10px"><p class="muted" style="font-weight:700">${label}</p><div class="type-picker">${SLIDE_TYPES.filter((t) => t.mode === m).map((t) => `<button class="type-btn" type="button" data-type="${t.type}"><strong>${t.label}</strong><span>${t.hint}</span></button>`).join("")}</div></div>`;
   $("#typePicker").innerHTML = mode === "play"
     ? group("play", "Quiz games") + group("kural", "Mix in a poll or feedback slide (optional)")
@@ -107,7 +109,7 @@ function mediaEditor(q, qi) {
       <input type="text" data-f="link" placeholder="…or paste a picture, GIF or YouTube link" aria-label="Slide ${qi + 1} picture or YouTube link">
     </div><p class="q-tip">Tip: you can also drag a picture onto this card, or paste one with Ctrl/Cmd+V.</p>`;
   if (m.kind === "image") return `<div class="q-media-prev"><img src="${esc(m.src)}" alt="Picture for slide ${qi + 1}"><span class="muted">Picture shows on the big screen.</span><button class="icon-btn" type="button" data-f="unmedia">Remove picture</button></div>`;
-  return `<div class="q-media-prev"><img src="${ytThumb(m)}" alt="" onerror="this.style.visibility='hidden'">
+  return `<div class="q-media-prev"><img src="${ytThumb(m)}" alt="" class="yt-thumb">
       <div class="stack" style="gap: 6px"><span style="font-weight: 800">YouTube video</span>
         <div class="yt-times"><label class="muted" for="ys${qi}">Start</label><input id="ys${qi}" type="text" data-f="ytstart" placeholder="0:00" value="${fmtTime(m.start)}"><label class="muted" for="ye${qi}">End</label><input id="ye${qi}" type="text" data-f="ytend" placeholder="end" value="${fmtTime(m.end)}"></div></div>
       <button class="icon-btn" type="button" data-f="unmedia">Remove video</button></div>`;
@@ -194,6 +196,9 @@ $("#qList").addEventListener("click", (e) => {
   else return;
   saveDraft(); renderEditor();
 });
+
+// Hide YouTube thumbnails that fail to load (no inline handlers: the page's security policy blocks them)
+document.addEventListener("error", (e) => { if (e.target.classList && e.target.classList.contains("yt-thumb")) e.target.style.visibility = "hidden"; }, true);
 
 // Paste a picture/YouTube link
 $("#qList").addEventListener("change", (e) => {
@@ -295,42 +300,119 @@ $("#importFile").addEventListener("change", async (e) => {
   if (errors.length || !slides.length) { err.textContent = (slides.length ? `Added ${slides.length}. Skipped: ` : "Nothing imported. ") + errors.slice(0, 4).join(" · "); err.hidden = false; }
 });
 
-$("#playCustom").addEventListener("click", () => {
-  const err = $("#editErr"); err.hidden = true;
+// Turn the editor draft into a playable quiz, or explain what's missing
+function buildQuiz() {
   const out = [], media = [];
   for (const [i, q] of draft.questions.entries()) {
     const n = i + 1, text = (q.text || "").trim();
     const blank = !text && (q.answers || []).every((a) => !a.trim()) && (q.statements || []).every((s) => !s.trim());
     if (blank) continue;
-    if (!text) return fail(`Slide ${n} needs a question.`);
+    if (!text) return { error: `Slide ${n} needs a question.` };
     if (q.type === "quiz" || q.type === "poll") {
       const filled = q.answers.map((a, ai) => ({ a: a.trim(), ai })).filter((x) => x.a);
-      if (filled.length < 2) return fail(`Slide ${n} needs at least 2 ${q.type === "poll" ? "options" : "answers"}.`);
+      if (filled.length < 2) return { error: `Slide ${n} needs at least 2 ${q.type === "poll" ? "options" : "answers"}.` };
       if (q.type === "quiz") {
         const correct = filled.map((x, xi) => (q.correct.includes(x.ai) ? xi : -1)).filter((x) => x >= 0);
-        if (!correct.length) return fail(`Slide ${n}: tap Right on the correct answer (the one marked is empty).`);
+        if (!correct.length) return { error: `Slide ${n}: tap Right on the correct answer (the one marked is empty).` };
         media[out.length] = q.media || null;
-        out.push({ type: "quiz", text, answers: filled.map((x) => x.a), correct, time: q.time, points: q.points ?? 1 });
+        const slide = { type: "quiz", text, answers: filled.map((x) => x.a), correct, time: q.time, points: q.points ?? 1 };
+        if (q.media && !(q.media.kind === "image" && q.media.src.startsWith("data:"))) slide.media = q.media;   // stored pictures and videos travel with the quiz
+        out.push(slide);
       } else out.push({ type: "poll", text, answers: filled.map((x) => x.a) });
     } else if (q.type === "scale") {
       const statements = q.statements.map((s) => s.trim()).filter(Boolean);
-      if (!statements.length) return fail(`Slide ${n} needs at least one statement to rate.`);
+      if (!statements.length) return { error: `Slide ${n} needs at least one statement to rate.` };
       out.push({ type: "scale", text, statements, low: q.low, high: q.high });
     } else out.push({ type: q.type, text });
   }
-  if (!out.length) return fail("Add at least one slide.");
-  const quiz = { title: draft.title.trim() || (builderMode === "play" ? "My Kalakal quiz" : "My Kalakal session"), questions: out };
-  if (editingPin) { pendingMedia = media; $("#playCustom").disabled = true; conn.send({ t: "update_quiz", quiz }); return; }
-  createGame(quiz, err, media);
-  function fail(t) { err.textContent = t; err.hidden = false; }
+  if (!out.length) return { error: "Add at least one slide." };
+  return { quiz: { title: draft.title.trim() || (builderMode === "play" ? "My Kalakal quiz" : "My Kalakal session"), questions: out }, media };
+}
+
+$("#playCustom").addEventListener("click", () => {
+  const err = $("#editErr"); err.hidden = true;
+  const b = buildQuiz();
+  if (b.error) { err.textContent = b.error; err.hidden = false; return; }
+  if (editingPin) { pendingMedia = b.media; $("#playCustom").disabled = true; conn.send({ t: "update_quiz", quiz: b.quiz }); return; }
+  createGame(b.quiz, err, b.media, draft.id || null);
 });
+
+// ---------- saving to My quizzes ----------
+const CATS = { general: "General knowledge", tamil: "Tamil culture & language", sweden: "Sweden & Swedish", festivals: "Festivals & celebrations", entertainment: "Movies, music & TV", sports: "Sports & cricket", science: "Science & nature", history: "History & geography", kids: "Kids & school", languages: "Language learning", work: "Work & icebreakers", fun: "Fun & party" };
+$("#qCategory").innerHTML = Object.entries(CATS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
+function renderMeta() {
+  const m = draft.meta || (draft.meta = { description: "", category: builderMode === "kural" ? "work" : "general", language: "English", age: "everyone", visibility: "private" });
+  $("#qDesc").value = m.description || ""; $("#qCategory").value = m.category; $("#qLanguage").value = m.language; $("#qAge").value = m.age;
+  document.querySelectorAll('input[name="vis"]').forEach((r) => (r.checked = r.value === m.visibility));
+  $("#saveState").innerHTML = draft.id ? `Saved in <a href="/me.html">My quizzes</a> · <a href="/quiz.html?id=${draft.id}">quiz page</a>` : "Not saved to your account yet";
+}
+for (const [id, key] of [["qDesc", "description"], ["qCategory", "category"], ["qLanguage", "language"], ["qAge", "age"]]) {
+  $("#" + id).addEventListener("input", (e) => { draft.meta[key] = e.target.value; saveDraft(); });
+}
+document.querySelectorAll('input[name="vis"]').forEach((r) => r.addEventListener("change", () => { draft.meta.visibility = r.value; saveDraft(); }));
+
+// Decode a data: URL picture without fetch() (the page's security policy only allows fetching our own server)
+function dataUrlToBlob(src) {
+  const [head, b64] = src.split(",");
+  const type = (head.match(/^data:([^;]+)/) || [])[1] || "image/webp";
+  const bin = atob(b64), bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type });
+}
+
+$("#saveQuiz").addEventListener("click", async () => {
+  const note = $("#saveState"), btn = $("#saveQuiz"), err = $("#editErr");
+  err.hidden = true;
+  const m = await me();
+  if (!m.accounts || !m.signIn) { note.textContent = "Saving to an account isn't available yet. Your draft is kept in this browser."; return; }
+  if (!m.user) { saveDraft(); return signIn(`/host.html?build=${builderMode}`); }
+  if (!m.user.acceptedTerms) { saveDraft(); location.href = `/me.html?welcome=1&next=${encodeURIComponent(`/host.html?build=${builderMode}`)}`; return; }
+  btn.disabled = true; btn.textContent = "Saving…";
+  try {
+    // Pictures embedded in the draft are uploaded first, so the saved quiz (and players' phones) can show them
+    let kept = 0;
+    for (const q of draft.questions) {
+      if (q.media && q.media.kind === "image" && q.media.src.startsWith("data:")) {
+        try {
+          const blob = dataUrlToBlob(q.media.src);
+          const r = await api("/api/media", { method: "POST", raw: blob, type: blob.type || "image/webp" });
+          q.media = { kind: "image", src: r.src };
+        } catch (e) { if (e.data && e.data.mediaOff) kept++; else throw e; }
+      }
+    }
+    saveDraft();
+    const b = buildQuiz();
+    if (b.error) throw new Error(b.error);
+    const res = draft.id
+      ? await api(`/api/quizzes/${draft.id}`, { method: "PUT", body: { quiz: b.quiz, meta: draft.meta } })
+      : await api("/api/quizzes", { method: "POST", body: { quiz: b.quiz, meta: draft.meta } });
+    draft.id = res.id; saveDraft(); renderMeta();
+    const where = res.visibility === "public" ? (res.status === "review" ? " · Public: waiting for a quick approval before it appears in the library" : " · Public in the library") : res.visibility === "unlisted" ? " · Unlisted: anyone with the link" : " · Private";
+    note.innerHTML = `Saved ✓${where} · <a href="/quiz.html?id=${res.id}">quiz page</a>${kept ? ` · ${kept} picture${kept > 1 ? "s" : ""} kept on this device only` : ""}`;
+  } catch (e) {
+    if (e.data && e.data.needsTerms) { location.href = `/me.html?welcome=1&next=${encodeURIComponent(`/host.html?build=${builderMode}`)}`; return; }
+    err.textContent = e.message; err.hidden = false; note.textContent = "Not saved";
+  } finally { btn.disabled = false; btn.textContent = "Save to My quizzes"; }
+});
+
+// Open a saved quiz from My quizzes: /host.html?build=play&quiz=<id>
+async function openSaved(id) {
+  try {
+    const r = await api(`/api/quizzes/${encodeURIComponent(id)}`);
+    const d = quizToDraft(r.quiz);
+    d.id = r.id; d.meta = { description: r.description || "", category: r.category, language: r.language, age: r.age, visibility: r.visibility };
+    editingPin = null;
+    openBuilder(r.mode === "pulse" ? "kural" : "play", d);
+    history.replaceState(null, "", `/host.html?build=${builderMode}&quiz=${r.id}`);
+  } catch (e) { show("setup"); $("#setupErr").textContent = e.message; $("#setupErr").hidden = false; }
+}
 
 // Pictures and videos stay in this browser tab (the big screen); phones only get the answers
 let mediaList = [];
-async function createGame(quiz, errEl, media = []) {
+async function createGame(quiz, errEl, media = [], quizId = null) {
   errEl.hidden = true;
   try {
-    const res = await fetch("/api/games", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ quiz }) });
+    const res = await fetch("/api/games", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(quizId ? { quiz, quizId } : { quiz }) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Could not create the game");
     localStorage.setItem("kalakal:host:" + data.pin, data.hostKey);
@@ -465,7 +547,7 @@ function question(m) {
   $("#qTitle").textContent = m.text;
   $("#qAnswers").innerHTML = answerTiles(m.answers);
   $("#answered").textContent = `${m.answered || 0} of ${m.players} answered`;
-  const media = mediaList[m.index];
+  const media = m.media || mediaList[m.index];
   $("#qMedia").hidden = !media; $("#qMedia").innerHTML = mediaHtml(media);
   $("#qMinni").innerHTML = M("host-thinking", media ? 96 : 130, "Host is thinking");
   $("#qX2").hidden = !(m.points === 2 || m.points === 0); $("#qX2").textContent = m.points === 2 ? "Double points" : "No points: warm-up";
@@ -659,6 +741,8 @@ function message(title, text, mood, withNext = false) {
 }
 
 const build = params.get("build");
+mountNav("host");
 if (pin) openGame();
+else if (params.get("quiz")) openSaved(params.get("quiz"));
 else if (build === "play" || build === "kural") { openBuilder(build); if (params.get("paste")) $("#openPaste").click(); else if (params.get("ai") && build === "play") $("#openAi").click(); }
 else show("setup");

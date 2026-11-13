@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Create your own quiz · Kalakal</title>
 <meta name="description" content="Five easy ways to make your own Kalakal quiz: type or paste, build question by question, import a spreadsheet, use your AI chat, add pictures and videos.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Kalakal">
+<meta property="og:title" content="Create your own quiz · Kalakal">
+<meta property="og:description" content="Five easy ways to make a quiz: AI, type or paste, spreadsheet, question by question, pictures and videos.">
+<meta property="og:image" content="https://kalakal.se/img/og-kalakal.png">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#160B2A">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/img/icon.svg" type="image/svg+xml">
@@ -68,10 +74,7 @@
 </head>
 <body>
 <div class="wrap">
-  <nav class="nav">
-    <a class="brand" href="/"><img src="/img/icon.svg" alt="">kalakal</a>
-    <div class="row"><a class="btn btn-ghost btn-sm" href="#faq">FAQ</a><a class="btn btn-primary btn-sm" href="/host.html?build=play">Open the quiz builder</a></div>
-  </nav>
+  <div data-nav></div>
 
   <header class="hero">
     <div class="stack" style="gap: 18px">
@@ -185,14 +188,14 @@
         <li>On a quiz question, press <strong>Add picture</strong>. You can also drag a picture onto the question, or paste one with Ctrl/Cmd + V.</li>
         <li>For a GIF or an online picture, paste its link into the link box.</li>
         <li>For a video, paste a <strong>YouTube</strong> link and set the start and end time, so only the part you want plays.</li>
-        <li>The picture or video shows on the big screen. Phones just show the answer buttons, so they stay fast on busy Wi-Fi.</li>
+        <li>The picture or video shows on the big screen. Save the quiz to My quizzes and pictures also show on players' phones.</li>
       </ol>
       <p class="best"><strong>Good to know:</strong> big photos are shrunk automatically. Use pictures you took yourself or are allowed to use.</p>
       <div class="row"><a class="btn btn-primary btn-sm" href="/host.html?build=play">Add a picture question</a></div>
     </div>
     <figure class="way-media">
       <picture><source srcset="/img/guide/media.webp" media="(prefers-reduced-motion: reduce)"><img src="/img/guide/media.gif" alt="Animation: adding a picture to a question, pasting a YouTube link with start and end times, and the picture showing on the big screen during the game." width="840" height="525" loading="lazy"></picture>
-      <figcaption>Picture on the question, then on the big screen.</figcaption>
+      <figcaption>Picture on the question, then on the big screen (and on phones for saved quizzes).</figcaption>
     </figure>
   </section>
 
@@ -248,8 +251,10 @@ Best snack for the break?
   <section class="block" id="faq">
     <h2>Questions people ask</h2>
     <div class="faq">
-      <details><summary>Do I need an account?</summary><div class="a"><p>No. Your quiz is saved as a draft in this browser while you work. To keep a copy, move it to another computer or share it with a friend, press <strong>Export as spreadsheet</strong>, then import it there. Saved quiz libraries with sign-in are coming.</p></div></details>
-      <details><summary>Where is my quiz saved, and can I lose it?</summary><div class="a"><p>Drafts are stored in your browser on this device. They stay when you close the tab, but clearing your browser data or using a private window removes them. Export important quizzes as a spreadsheet to be safe.</p></div></details>
+      <details><summary>Do I need an account?</summary><div class="a"><p>Not to create or host a game: drafts are kept in your browser. <strong>Sign in with Google</strong> (free) to save quizzes to <strong>My quizzes</strong>, open them on any device, share them in the <a href="/library.html">library</a> and see how often they're played. Players never need an account.</p></div></details>
+      <details><summary>Where are my quizzes saved?</summary><div class="a"><p>Signed in: in your Kalakal account (press <strong>Save to My quizzes</strong> in the editor, under Save &amp; share). Not signed in: in this browser only, so clearing browser data removes them; use <strong>Export as spreadsheet</strong> to keep a copy.</p></div></details>
+      <details><summary>How do I share a quiz in the library?</summary><div class="a"><p>In the editor open <strong>Save &amp; share</strong>, pick a category and language, choose <strong>Public</strong> and press <strong>Save to My quizzes</strong>. Your first public quiz gets a quick check before it appears; after that, quizzes go live straight away after an automatic check. <strong>Unlisted</strong> means only people with the link can find it. The library never shows the answers.</p></div></details>
+      <details><summary>Can I use someone else's quiz from the library?</summary><div class="a"><p>Yes. Press <strong>Host this quiz</strong> to play it right away, or <strong>Copy and edit</strong> to save your own private copy and change anything. Like the ones you enjoy, and use <strong>Report</strong> if something is wrong or unsuitable.</p></div></details>
       <details><summary>How many questions and answers can a quiz have?</summary><div class="a"><p>Up to <strong>50 slides</strong> per session. Each quiz question has <strong>2 to 4 answers</strong> and <strong>10 to 60 seconds</strong> to answer. Questions can be up to 200 characters and answers up to 80.</p></div></details>
       <details><summary>Can more than one answer be right?</summary><div class="a"><p>Yes. Tap <strong>Right</strong> on every correct answer, or use <strong>*</strong> on several lines. Players pick one answer, and any of the right ones scores. The big screen highlights all of them at the reveal.</p></div></details>
       <details><summary>How do points work? What are Double and No points?</summary><div class="a"><p>A right answer scores <strong>500 to 1,000 points</strong>: the faster, the more. Answering in a row adds a streak bonus of up to +500. <strong>Double</strong> doubles the speed points, which is great for a final round. <strong>No points</strong> makes a warm-up question: players answer and see if they were right, but scores and streaks don't change.</p></div></details>
@@ -257,7 +262,7 @@ Best snack for the break?
         <p><strong>Pictures:</strong> upload, drag or paste JPG, PNG or WebP. Big photos are shrunk automatically so they load fast.</p>
         <p><strong>GIFs:</strong> upload one up to 1.5 MB, or paste a link to a GIF online.</p>
         <p><strong>Videos:</strong> paste a YouTube link and choose the start and end. Uploading your own video files isn't possible yet.</p>
-        <p>Pictures and videos show on the big screen. Phones show the answer buttons, which keeps the game fast for everyone.</p></div></details>
+        <p>Pictures and videos show on the big screen. When you save the quiz to your account, its pictures also appear on players' phones above the answer buttons.</p></div></details>
       <details><summary>Can AI write my quiz?</summary><div class="a"><p>Yes. In the builder press <strong>Create with AI</strong>, write a topic (or paste notes or pick a PDF), choose the number of questions, difficulty, audience and language, and press <strong>Write my quiz</strong>. You'll see every question before anything is added.</p><p><strong>Always check the answers.</strong> AI can be confidently wrong, especially on recent events, local facts and numbers. Use <strong>New question</strong>, <strong>Harder</strong>, <strong>Easier</strong> or <strong>Better wrong answers</strong> to fix a question, or untick it.</p></div></details>
       <details><summary>How many AI quizzes can I make?</summary><div class="a"><p><strong>5 AI quizzes a day</strong> per person, each up to 20 questions, plus 40 single-question changes. The count resets every night at 1 am Swedish time (2 am in summer). If you run out, use <strong>Copy AI prompt</strong> in the paste window with ChatGPT, Claude or Gemini. It's unlimited and the reply pastes straight back in.</p></div></details>
       <details><summary>Can the AI write in Tamil or Swedish?</summary><div class="a"><p>Yes. Pick the language before you press Write my quiz: English, Tamil, Swedish, Hindi and several more, or type any other language under <strong>Other…</strong>. Quality is best in English and widely used languages; in Tamil, read the questions carefully and fix any odd wording in the editor.</p></div></details>
@@ -283,6 +288,8 @@ Best snack for the break?
     <h2 style="font-size: clamp(30px, 3.4vw, 44px)">Ready? Make it Kalakal.</h2>
     <div class="row" style="justify-content: center"><a class="btn btn-primary" href="/host.html?build=play">Start a quiz</a><a class="btn btn-ghost" href="/host.html">Play a ready-made quiz</a></div>
   </section>
+  <footer data-foot></footer>
 </div>
+<script type="module" src="/js/create-page.js"></script>
 </body>
 </html>

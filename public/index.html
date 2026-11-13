@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kalakal: live quizzes and polls anyone can join</title>
 <meta name="description" content="Quizzes, polls and party games that anyone can join in five seconds with a PIN. No app, no account.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Kalakal">
+<meta property="og:title" content="Kalakal: live quizzes & polls for everyone">
+<meta property="og:description" content="Host quizzes and live polls on a big screen. Everyone joins with a PIN on their phone. No app, free.">
+<meta property="og:image" content="https://kalakal.se/img/og-kalakal.png">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#160B2A">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/img/icon.svg" type="image/svg+xml">
@@ -24,10 +30,7 @@
 </head>
 <body>
 <div class="wrap">
-  <nav class="home-nav">
-    <a class="brand" href="/"><img src="/img/icon.svg" alt="">kalakal</a>
-    <div class="row"><a class="btn btn-ghost btn-sm" href="/create.html">Create a quiz</a><a class="btn btn-primary btn-sm" href="/host.html">Host a game</a></div>
-  </nav>
+  <div data-nav></div>
   <main class="hero">
     <div class="hero-copy">
       <img class="wordmark" src="/img/logo.svg" alt="Kalakal">
@@ -46,21 +49,13 @@
       <button class="btn btn-primary btn-block" type="submit">Enter</button>
     </form>
   </main>
-  <footer class="muted" style="padding: 24px 0; font-size: 15px">Kalakal is Tamil slang for "awesome".</footer>
+  <section class="stack" id="popular" style="gap: 18px; padding-top: 12px" hidden>
+    <div class="row" style="justify-content: space-between"><h2 style="font-size: 28px">Popular this week</h2><a class="btn btn-ghost btn-sm" href="/library.html">See the library</a></div>
+    <div class="q-cards" id="popularGrid"></div>
+  </section>
+  <p class="muted" style="padding: 24px 0 0; font-size: 15px">Kalakal is Tamil slang for "awesome".</p>
+  <footer data-foot></footer>
 </div>
-<script>
-  document.getElementById("join").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const pin = document.getElementById("pin").value.replace(/\D/g, "");
-    const err = document.getElementById("err");
-    err.hidden = true;
-    if (pin.length !== 6) { err.textContent = "A game PIN has 6 digits."; err.hidden = false; return; }
-    try {
-      const r = await fetch("/api/games/" + pin).then((r) => r.json());
-      if (!r.exists) { err.textContent = "We couldn't find that game. Check the PIN on the big screen."; err.hidden = false; return; }
-      location.href = "/play.html?pin=" + pin;
-    } catch { err.textContent = "Connection problem. Try again."; err.hidden = false; }
-  });
-</script>
+<script type="module" src="/js/home.js"></script>
 </body>
 </html>

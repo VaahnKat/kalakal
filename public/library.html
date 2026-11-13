@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiz library · Kalakal</title>
+<meta name="description" content="Free quizzes made by the Kalakal community: Tamil culture, Sweden, festivals, science, kids, work icebreakers and more. Host any of them in seconds.">
+<meta property="og:title" content="Kalakal quiz library">
+<meta property="og:description" content="Free quizzes anyone can host in seconds. Players join with a PIN on their phones.">
+<meta property="og:image" content="https://kalakal.se/img/og-kalakal.png">
+<meta name="theme-color" content="#160B2A">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/img/icon.svg" type="image/svg+xml">
+<link rel="preload" href="/fonts/catamaran.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/unbounded.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/kalakal.css">
+<style>
+  .lib-hero { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; padding: 16px 0 24px; }
+  .lib-hero h1 { font-size: clamp(34px, 4.6vw, 56px); }
+  .lib-hero img { width: 150px; }
+  @media (max-width: 640px) { .lib-hero { grid-template-columns: 1fr; } .lib-hero img { display: none; } }
+  .search { display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch; }
+  .search input { flex: 1 1 320px; min-height: 52px; font-size: 18px; width: auto; }
+  .search select { flex: 0 1 180px; min-height: 52px; width: auto; }
+  .search .btn { min-height: 52px; }
+  .cats { display: flex; gap: 8px; overflow-x: auto; padding: 16px 0 6px; scrollbar-width: thin; }
+  .cat { white-space: nowrap; background: var(--night); border: 2px solid var(--line); color: var(--cream); border-radius: 99px; padding: 8px 16px; font: 700 15px var(--body); cursor: pointer; min-height: 44px; }
+  .cat[aria-pressed="true"] { background: var(--marigold); border-color: var(--marigold); color: var(--ink); }
+  .sorts { display: flex; gap: 4px; padding: 14px 0 20px; border-bottom: 1px solid var(--line); margin-bottom: 22px; flex-wrap: wrap; }
+  .sort { background: none; border: 0; color: var(--soft); font: 800 15px var(--display); padding: 10px 14px; border-radius: 12px; cursor: pointer; min-height: 44px; }
+  .sort[aria-pressed="true"] { color: var(--ink); background: var(--teal); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div data-nav></div>
+  <header class="lib-hero">
+    <div class="stack" style="gap: 12px">
+      <p class="eyebrow">Quiz library</p>
+      <h1>Find a quiz. Host it in seconds.</h1>
+      <p class="muted" style="font-size: 19px">Made by the Kalakal community. Free to play, free to copy and make your own.</p>
+    </div>
+    <img class="mascot float" src="/img/mascots/champion.webp" alt="" width="150" height="165">
+  </header>
+
+  <form class="search" id="searchForm" role="search">
+        <input id="q" type="search" placeholder="Search quizzes, e.g. Pongal, planets, Sweden" aria-label="Search quizzes" maxlength="60">
+    <select id="lang" aria-label="Language"><option value="">Any language</option></select>
+    <select id="age" aria-label="Age group"><option value="">Any age</option><option value="kids">Kids</option><option value="teens">Teens</option><option value="adults">Adults</option></select>
+    <button class="btn btn-primary" type="submit">Search</button>
+  </form>
+  <div class="cats" id="cats" role="group" aria-label="Categories"></div>
+  <div class="sorts" role="group" aria-label="Sort">
+    <button class="sort" type="button" data-sort="popular" aria-pressed="true">Popular</button>
+    <button class="sort" type="button" data-sort="trending" aria-pressed="false">Trending this week</button>
+    <button class="sort" type="button" data-sort="new" aria-pressed="false">Newest</button>
+    <button class="sort" type="button" data-sort="top" aria-pressed="false">Top rated</button>
+  </div>
+
+  <div class="q-cards" id="grid" aria-live="polite"></div>
+  <div class="row" style="justify-content: center; padding: 28px 0"><button class="btn btn-ghost" type="button" id="more" hidden>Show more</button></div>
+  <footer data-foot></footer>
+</div>
+<script type="module" src="/js/library.js"></script>
+</body>
+</html>

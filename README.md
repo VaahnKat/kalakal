@@ -2,12 +2,14 @@
 
 Live quizzes and audience interaction anyone can join with a PIN. Host on a big screen, play on phones. No app, no account.
 
-**Live:** https://kalakal.prabhuwinz17.workers.dev · **Version:** 0.6 · **Full documentation:** [docs/HANDBOOK.md](docs/HANDBOOK.md)
+**Live:** https://kalakal.prabhuwinz17.workers.dev · **Version:** 0.7 · **Full documentation:** [docs/HANDBOOK.md](docs/HANDBOOK.md)
 
 | Mode | Like | What players do |
 |---|---|---|
 | **Kalakal Play** | Kahoot | Answer timed quiz questions for points, streaks and the podium |
 | **Kalakal Pulse** | Mentimeter | Polls, word clouds, open questions, 1–5 scales and live Q&A, anonymously |
+
+Hosts can sign in with Google to save quizzes and share them in the public **library**, where anyone can host or copy them.
 
 Every player gets a character (2,800 looks), can take a fun name like *Captain Dosa*, and sees animated reactions for streaks, taking the lead and reaching the top 3.
 

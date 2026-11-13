@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Play Kalakal</title>
+<meta name="description" content="Tap to join with the game PIN. No app needed.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Kalakal">
+<meta property="og:title" content="Join the Kalakal game!">
+<meta property="og:description" content="Tap to join with the game PIN. No app needed.">
+<meta property="og:image" content="https://kalakal.se/img/og-kalakal.png">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#160B2A">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/img/icon.svg" type="image/svg+xml">
@@ -47,6 +54,7 @@
   .me-av { display: inline-flex; }
   .milestone { font-family: var(--display); font-weight: 800; font-size: 22px; background: var(--ink); color: var(--marigold); border-radius: 99px; padding: 8px 18px; animation: pop .5s .4s cubic-bezier(.2,1.4,.4,1) both; }
   .status { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: var(--coral); color: var(--ink); font-weight: 800; padding: 6px 14px; border-radius: 99px; z-index: 60; font-size: 15px; }
+  .p-media { width: 100%; max-height: 28vh; object-fit: contain; border-radius: 14px; background: var(--night); }
 </style>
 </head>
 <body>
@@ -99,6 +107,7 @@
     <div class="p-top"><span class="p-name"><span class="me-av"></span><span class="me"></span></span><span class="muted" id="qCount"></span></div>
     <p class="pill" id="qX2" style="align-self: flex-start; background: var(--coral); color: var(--ink)" hidden></p>
     <p style="font-family: var(--display); font-weight: 700; font-size: 20px" id="qText"></p>
+    <img id="qImg" class="p-media" alt="" hidden>
     <div class="p-answers" id="pAnswers"></div>
   </div>
 </section>

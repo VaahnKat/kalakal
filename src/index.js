@@ -14,7 +14,10 @@ import { DurableObject } from "cloudflare:workers";
 import { FUN_NAMES, funName } from "../public/js/names.js";
 import { AVATAR_COUNT } from "../public/js/avatar.js";
 import { clean, isRude } from "./text.js";
+import { validateSession } from "./quiz.js";
 import { handleAi, AiQuota } from "./ai.js";
+import { handleAuth } from "./auth.js";
+import { handleLibrary, hostableQuiz, countPlay } from "./library.js";
 
 export { AiQuota };
 
@@ -34,20 +37,38 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    // Requests that change something must come from Kalakal's own pages (protects the sign-in cookie)
+    if (request.method !== "GET" && request.method !== "HEAD" && (url.pathname.startsWith("/api/") || url.pathname.startsWith("/auth/"))) {
+      const origin = request.headers.get("Origin");
+      if (origin && origin !== url.origin) return json({ error: "Not allowed" }, 403);
+    }
+
+    if (url.pathname.startsWith("/auth/")) return handleAuth(request, env, url);
+
     if (url.pathname === "/api/games" && request.method === "POST") {
       let body;
       try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
-      const quiz = validateSession(body && body.quiz);
+      let source = body && body.quiz, quizId = null;
+      // Starting a saved or library quiz: the stored version is used unless it's your own (then your latest edits count)
+      if (body && typeof body.quizId === "string" && env.DB) {
+        const h = await hostableQuiz(request, env, body.quizId).catch(() => null);
+        if (!h) return json({ error: "That quiz isn't available." }, 404);
+        if (!(h.own && source)) source = h.quiz;
+        quizId = body.quizId;
+      }
+      const quiz = validateSession(source);
       if (quiz.error) return json({ error: quiz.error }, 400);
       const hostKey = randomToken();
       for (let attempt = 0; attempt < 8; attempt++) {
         const pin = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
         const stub = env.ROOMS.get(env.ROOMS.idFromName(pin));
-        const res = await stub.fetch("https://room/init", { method: "POST", body: JSON.stringify({ pin, quiz: quiz.value, hostKey }) });
-        if (res.status === 200) return json({ pin, hostKey });
+        const res = await stub.fetch("https://room/init", { method: "POST", body: JSON.stringify({ pin, quiz: quiz.value, hostKey, quizId }) });
+        if (res.status === 200) return json({ pin, hostKey, quiz: quiz.value });
       }
       return json({ error: "Could not allocate a PIN, try again" }, 503);
     }
+
+    if (/^\/api\/(me|quizzes|library|creators|admin|media)(\/|$)/.test(url.pathname) || url.pathname.startsWith("/media/")) return handleLibrary(request, env, url);
 
     let m = url.pathname.match(/^\/api\/games\/(\d{6})$/);
     if (m && request.method === "GET") {
@@ -68,38 +89,6 @@ export default {
 };
 
 // ---------- validation helpers ----------
-
-function validateSession(q) {
-  if (!q || typeof q !== "object") return { error: "Missing quiz" };
-  const title = clean(q.title, 80) || "Kalakal session";
-  if (!Array.isArray(q.questions) || q.questions.length === 0) return { error: "Add at least one slide" };
-  if (q.questions.length > MAX_SLIDES) return { error: `Max ${MAX_SLIDES} slides` };
-  const slides = [];
-  for (const [i, item] of q.questions.entries()) {
-    const n = i + 1;
-    const type = TYPES.includes(item && item.type) ? item.type : "quiz";
-    const text = clean(item && item.text, 200);
-    if (!text) return { error: `Slide ${n} has no question text` };
-    if (type === "quiz" || type === "poll") {
-      const answers = (Array.isArray(item.answers) ? item.answers : []).map((a) => clean(a, 80)).filter(Boolean);
-      if (answers.length < 2 || answers.length > 4) return { error: `Slide ${n} needs 2 to 4 answers` };
-      if (type === "quiz") {
-        // correct: one index or a list of indexes (any of them counts as right)
-        const correct = [...new Set((Array.isArray(item.correct) ? item.correct : [item.correct]).map(Number))]
-          .filter((c) => Number.isInteger(c) && c >= 0 && c < answers.length).sort();
-        if (!correct.length) return { error: `Slide ${n} has no correct answer` };
-        const time = Math.min(120, Math.max(5, Number(item.time) || 20));
-        const points = [0, 1, 2].includes(Number(item.points)) ? Number(item.points) : 1;   // 0 = no points, 2 = double
-        slides.push({ type, text, answers, correct, time, points });
-      } else slides.push({ type, text, answers });
-    } else if (type === "scale") {
-      const statements = (Array.isArray(item.statements) ? item.statements : []).map((s) => clean(s, 80)).filter(Boolean).slice(0, 4);
-      if (!statements.length) return { error: `Slide ${n} needs at least one statement to rate` };
-      slides.push({ type, text, statements, low: clean(item.low, 24) || "Disagree", high: clean(item.high, 24) || "Agree" });
-    } else slides.push({ type, text });
-  }
-  return { value: { title, questions: slides } };
-}
 
 function validAvatar(v) {
   const n = Number(v);
@@ -151,8 +140,8 @@ export class GameRoom extends DurableObject {
     if (url.pathname === "/init") {
       const fresh = this.setup && Date.now() - this.setup.createdAt < 6 * 3600 * 1000;
       if (fresh) return new Response("PIN in use", { status: 409 });
-      const { pin, quiz, hostKey } = await request.json();
-      this.setup = { pin, quiz, hostKey, createdAt: Date.now() };
+      const { pin, quiz, hostKey, quizId } = await request.json();
+      this.setup = { pin, quiz, hostKey, quizId: quizId || null, createdAt: Date.now(), counted: false };
       this.players.clear(); this.phase = "lobby"; this.qIndex = -1; this.locked = false; this.funNames = false; this.quizDone = 0; this.highlights = []; this.responses = {};
       await this.ctx.storage.put("setup", this.setup);
       return new Response("ok");
@@ -315,8 +304,9 @@ export class GameRoom extends DurableObject {
     this.phase = "question"; this.qStartedAt = Date.now();
     this.timer = setTimeout(() => this.reveal(), q.time * 1000 + 300);
     const base = { t: "question", index: i, total: this.slides.length, text: q.text, answers: q.answers, time: q.time, points: q.points, remaining: q.time * 1000 };
-    this.toHosts({ ...base, answered: 0, players: this.players.size });
-    this.toPlayers(() => base);
+    this.toHosts({ ...base, media: q.media || null, answered: 0, players: this.players.size });
+    // Phones get stored pictures too (videos play on the big screen only)
+    this.toPlayers(() => (q.media && q.media.kind === "image" ? { ...base, media: q.media } : base));
   }
 
   onAnswer(p, msg) {
@@ -383,6 +373,12 @@ export class GameRoom extends DurableObject {
 
   showEnd() {
     clearTimeout(this.timer);
+    // Count a play for the library: saved quizzes, games with at least 3 players, once per game
+    if (this.setup.quizId && !this.setup.counted && this.players.size >= 3) {
+      this.setup.counted = true;
+      this.ctx.storage.put("setup", this.setup);
+      this.ctx.waitUntil(countPlay(this.env, this.setup.quizId).catch((e) => console.error("count play", e && e.message)));
+    }
     const summary = this.summary();
     if (!this.hasQuiz) {
       this.phase = "finished";
@@ -515,7 +511,7 @@ export class GameRoom extends DurableObject {
     const snap = { t: "snapshot", pin: this.setup.pin, title: this.setup.quiz.title, quiz: this.setup.quiz, total: this.slides.length, phase: this.phase, players, locked: this.locked, funNames: this.funNames, mode: this.hasQuiz ? "play" : "kural" };
     if (this.phase === "question") {
       const q = this.slide;
-      snap.question = { index: this.qIndex, text: q.text, answers: q.answers, time: q.time, points: q.points, remaining: Math.max(0, q.time * 1000 - (Date.now() - this.qStartedAt)), answered: [...this.players.values()].filter((p) => p.answers[this.qIndex]).length };
+      snap.question = { index: this.qIndex, text: q.text, answers: q.answers, time: q.time, points: q.points, media: q.media || null, remaining: Math.max(0, q.time * 1000 - (Date.now() - this.qStartedAt)), answered: [...this.players.values()].filter((p) => p.answers[this.qIndex]).length };
     }
     if (this.phase === "engage") snap.engage = { index: this.qIndex, total: this.slides.length, slide: this.slide, results: this.results(this.qIndex), players: players.length };
     return snap;
@@ -524,7 +520,7 @@ export class GameRoom extends DurableObject {
   playerSnapshot(p) {
     if (this.phase === "question") {
       const q = this.slide;
-      return { t: "question", index: this.qIndex, total: this.slides.length, text: q.text, answers: q.answers, time: q.time, points: q.points, remaining: Math.max(0, q.time * 1000 - (Date.now() - this.qStartedAt)), alreadyAnswered: !!p.answers[this.qIndex] };
+      return { t: "question", index: this.qIndex, total: this.slides.length, text: q.text, answers: q.answers, time: q.time, points: q.points, media: q.media && q.media.kind === "image" ? q.media : undefined, remaining: Math.max(0, q.time * 1000 - (Date.now() - this.qStartedAt)), alreadyAnswered: !!p.answers[this.qIndex] };
     }
     if (this.phase === "engage") return this.engageForPlayer(p);
     if (this.phase === "podium") { const ranked = this.ranked(); return { t: "final", rank: ranked.indexOf(p) + 1, score: p.score, players: ranked.length, best: p.best }; }

@@ -1,7 +1,7 @@
 # Kalakal Handbook
 
 The one document that explains what Kalakal is, how it is built, and how to change it.
-Version 0.6 · November 2026 · Owner: Prabha
+Version 0.7 · November 2026 · Owner: Prabha
 
 **Live site:** https://kalakal.se (once connected, see section 7) · https://kalakal.prabhuwinz17.workers.dev
 **Code:** https://github.com/VaahnKat/kalakal (branch `main` deploys automatically)
@@ -53,12 +53,23 @@ kalakal/
 ├── src/
 │   ├── index.js              The server: API + live game rooms (Cloudflare Worker + Durable Object)
 │   ├── ai.js                 AI quiz generator: prompts, model calls, daily allowance (AiQuota)
+│   ├── auth.js               Google sign-in, sessions, admin check
+│   ├── db.js                 Database (D1) tables, created automatically; add changes to MIGRATIONS
+│   ├── library.js            Saved quizzes, library, pictures (R2), likes, reports, admin, account data
+│   ├── quiz.js               Quiz validation shared by games and saved quizzes
 │   └── text.js               Shared text cleaning and the blocked-words filter
 ├── public/                   Everything the browser downloads (no build step)
 │   ├── index.html            Home page with "Join a game"
 │   ├── host.html             Host: choose mode, build, lobby, big-screen game
 │   ├── play.html             Player's phone screens
 │   ├── create.html           "Create your own quiz" guide: 5 ways, step GIFs, FAQ
+│   ├── library.html          Public quiz library (search, categories, popular, trending)
+│   ├── quiz.html             A quiz's public page: Host, Copy and edit, Like, Share, Report
+│   ├── me.html               My quizzes, first-time welcome (13+, terms), account, export, delete
+│   ├── creator.html          A creator's public quizzes
+│   ├── admin.html            Admin: approvals, reports, numbers
+│   ├── privacy.html, terms.html  Legal pages
+│   ├── _headers              Security headers (CSP, HSTS…) for every page
 │   ├── avatars.html          Gallery of mascots and player characters
 │   ├── css/kalakal.css       All styles and brand tokens (colours, fonts, animations)
 │   ├── js/
@@ -70,6 +81,7 @@ kalakal/
 │   │   ├── quizzes.js        Slide types and the two ready-made sessions
 │   │   ├── quicktype.js      Quick-type text + spreadsheet import/export, AI prompt
 │   │   ├── ai-ui.js          "Create with AI" window: settings, PDF reading, review
+│   │   ├── account.js        Top menu with sign-in, footer, API helper, quiz cards
 │   │   └── media.js          Picture compression, YouTube embeds
 │   ├── img/                  Logo, icon, mascots, guide/ (step GIFs)
 │   ├── templates/            Downloadable spreadsheet template (CSV)
@@ -188,6 +200,40 @@ How pictures work today: uploads are shrunk in the browser and saved with the dr
 How it works: the browser sends the topic/notes and options to `POST /api/ai/quiz`. The Worker checks the daily allowance (`AiQuota` Durable Object, keyed by a daily-salted hash of the IP address, so no personal data is stored), asks the model for questions in the quick-type format, cleans and parses them with the same parser as pasted text, shuffles the answers, and returns slides. Nothing is added to the quiz until the host reviews it. If the model fails, the allowance is refunded. When the allowance runs out, people are offered **Copy AI prompt** instead.
 
 Local development uses fake AI replies (`npm run dev`, `AI_MOCK=1`), so it works without a Cloudflare login. `npm run dev:ai` uses the real model (needs `npx wrangler login`).
+
+### Accounts, saved quizzes and the library
+
+| I want to… | Change |
+|---|---|
+| Add or rename a category | `CATEGORIES` in `src/library.js`, `CAT_ORDER` in `public/js/account.js`, `CATS` in `public/js/host.js` |
+| Change when a quiz needs approval | `publicStatus()` in `src/library.js` (today: a creator's first public quiz, or the AI safety check says "unsafe") |
+| Change how many reports hide a quiz | `REPORTS_TO_HIDE` in `src/library.js` |
+| Change "popular" / "trending" | the `score` SQL in the `/api/library` route (`src/library.js`) |
+| Change what counts as a play | `showEnd()` in `src/index.js` (today: saved quiz, 3+ players, once per game) |
+| Change picture limits | `MEDIA_MAX` (per picture) and `MEDIA_PER_USER` in `src/library.js` |
+| Change the database | add a new list to `MIGRATIONS` in `src/db.js` (never edit an old one); it runs automatically |
+| Make someone an admin | add their Google email to the `ADMIN_EMAILS` secret in Cloudflare |
+| Edit the privacy policy or terms | `public/privacy.html`, `public/terms.html` (update the date at the top) |
+| Allow a new outside service on pages | `public/_headers` → `Content-Security-Policy` |
+
+**How it fits together**
+
+- **Sign-in:** Google only. `src/auth.js` redirects to Google, gets the email and name, creates the user and a session (random id in an HttpOnly cookie, row in D1, 30 days). New users see the welcome step (display name, 13+, terms) before they can save.
+- **Saved quizzes** live in D1 (`quizzes` table; questions as JSON). Each quiz is Private, Unlisted or Public. Public quizzes are `ok`, `review` (waiting for admin) or `hidden` (3 reports, or hidden by admin).
+- **Pictures:** uploaded on save to R2 at `u/<user>/<random>.<ext>`, served at `/media/...`. Saved quizzes keep `/media/...` links, so phones show pictures too. If R2 isn't switched on, pictures stay in the host's browser (big screen only).
+- **Library pages never get the answers.** Hosting a library quiz starts the game on the server from the stored copy. The host sees the answers, as in any quiz app.
+- **Plays** are counted per quiz per day when a game with 3+ players finishes. Popular = last 30 days, trending = last 7 days weighted towards today.
+- **Security:** requests that change something must come from Kalakal's own pages (Origin check); every quiz call checks the owner; SVG uploads are refused; strict Content-Security-Policy; GDPR export and delete in My quizzes.
+
+### Setup that needs the Cloudflare/Google dashboards (one time)
+
+| # | What | Where |
+|---|---|---|
+| 1 | **Google sign-in keys.** Google Cloud Console → APIs & Services → OAuth consent screen (External, app name Kalakal, support email, logo, links to /privacy.html and /terms.html) → Credentials → Create OAuth client ID → Web application. Authorised redirect URIs: `https://kalakal.prabhuwinz17.workers.dev/auth/google/callback` and `https://kalakal.se/auth/google/callback`. | console.cloud.google.com |
+| 2 | **Secrets in Cloudflare:** Workers & Pages → kalakal → Settings → Variables and Secrets → add as **Secret**: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAILS` (your Google email). Secrets survive deploys. | dash.cloudflare.com |
+| 3 | **Picture storage:** R2 → Get started (may ask for a card; usage within the free allowance costs nothing). Then uncomment the `r2_buckets` line in `wrangler.jsonc` and push: the bucket is created on deploy. | dash.cloudflare.com |
+| 4 | **Email** `hello@kalakal.se`: once kalakal.se is on Cloudflare: Email → Email Routing → forward to your inbox. | dash.cloudflare.com |
+| 5 | The **database** (D1, `kalakal-db`) is created automatically on the first deploy; nothing to do. If a deploy ever fails with a D1 error, create a D1 database called `kalakal-db` in the dashboard and redeploy. | |
 
 ### Rules and limits (all in `src/index.js`, top of file)
 
@@ -312,7 +358,7 @@ Host in one tab, join in another tab or from a phone on the same Wi-Fi (use the 
 ### Tests (run while `npm run dev` is running)
 
 ```bash
-npm test                                     # characters, names, milestones, question features, AI generator, quiz + Pulse bots
+npm test                                     # characters, names, milestones, question features, AI, accounts & library, quiz + Pulse bots
 node test/load-test.mjs http://localhost:8787 150   # 150 simulated players
 python3 test/screens.py                      # screenshots (needs Playwright + Chrome)
 ```
@@ -377,7 +423,6 @@ Cloudflare → Workers & Pages → kalakal → Deployments → choose an earlier
 **Next (suggested order)**
 
 1. Sound effects and music (with a mute button).
-2. Accounts, saved quiz library, template gallery; pictures stored in R2 so phones can show them too.
 3. Team / house battles (Vizha mode).
 4. GIF search, picture reveal effects, co-editing, audience-submitted questions.
 5. Redraw player characters in the 3D-sticker mascot style.

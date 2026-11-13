@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Host a Kalakal game</title>
+<meta name="description" content="Run a quiz or live poll on the big screen. Players join with a PIN.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Kalakal">
+<meta property="og:title" content="Host a Kalakal game">
+<meta property="og:description" content="Run a quiz or live poll on the big screen. Players join with a PIN.">
+<meta property="og:image" content="https://kalakal.se/img/og-kalakal.png">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#160B2A">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/img/icon.svg" type="image/svg+xml">
@@ -66,6 +73,20 @@
   .ai-edit-row input { flex: 1; }
   .ai-edit-row .mark { background: var(--night); border-color: var(--line); color: var(--soft); }
   .ai-edit-row .mark[aria-pressed="true"] { background: var(--teal); border-color: var(--teal); color: var(--ink); }
+  .meta-card summary { cursor: pointer; display: flex; gap: 6px 16px; align-items: center; flex-wrap: wrap; list-style: none; }
+  .meta-card summary::-webkit-details-marker { display: none; }
+  .meta-card summary::after { content: "Open"; margin-left: auto; font-weight: 800; color: var(--teal); font-size: 15px; }
+  .meta-card[open] summary::after { content: "Close"; }
+  .meta-card textarea { width: 100%; background: var(--ink); color: var(--cream); border: 2px solid var(--line); border-radius: 12px; padding: 10px 12px; font: 17px var(--body); resize: vertical; }
+  .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 12px; }
+  .meta-grid select { width: 100%; }
+  .vis { border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 10px; }
+  .vis legend { font-weight: 700; margin-bottom: 8px; }
+  .vis label { display: flex; gap: 10px; align-items: flex-start; background: var(--ink); border: 2px solid var(--line); border-radius: 14px; padding: 12px; cursor: pointer; }
+  .vis label:has(input:checked) { border-color: var(--teal); }
+  .vis input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--teal); flex-shrink: 0; }
+  .vis span { font-size: 15px; color: var(--soft); }
+  .vis strong { display: block; color: var(--cream); font-size: 16px; }
   .ai-btn { background: linear-gradient(90deg, var(--marigold), var(--coral)); }
   .ai-btn span { margin-right: 4px; }
   dialog.ai { width: min(920px, 94vw); }
@@ -165,7 +186,7 @@
 <!-- 1. Choose a mode -->
 <section class="screen" data-screen="setup">
   <div class="wrap">
-    <nav class="h-nav"><a class="brand" href="/"><img src="/img/icon.svg" alt="">kalakal</a><a class="muted" href="/avatars.html" style="font-weight: 700">Meet the crew</a></nav>
+    <div data-nav></div>
     <div class="stack" style="padding-bottom: 60px; gap: 28px">
       <div class="stack" style="gap: 8px">
         <h1 style="font-size: clamp(32px, 4vw, 48px)">What do you want to run?</h1>
@@ -219,6 +240,23 @@
     <p class="live-edit" id="liveEdit" hidden></p>
     <div class="stack" style="padding-bottom: 120px">
       <div class="field"><label for="quizTitle">Session title</label><input id="quizTitle" type="text" maxlength="80" placeholder="Friday team session"></div>
+      <details class="card stack meta-card" id="metaCard">
+        <summary><span class="eyebrow">Save &amp; share</span><span class="muted" id="saveState">Not saved to your account yet</span></summary>
+        <div class="stack" style="gap: 14px; padding-top: 14px">
+          <div class="field"><label for="qDesc">Short description (shown in the library)</label><textarea id="qDesc" maxlength="300" rows="2" placeholder="e.g. 10 fun questions about Pongal for families"></textarea></div>
+          <div class="meta-grid">
+            <div class="field"><label for="qCategory">Category</label><select id="qCategory"></select></div>
+            <div class="field"><label for="qLanguage">Language</label><select id="qLanguage"><option>English</option><option>Tamil</option><option>Swedish</option><option>Hindi</option><option>Spanish</option><option>French</option><option>German</option><option>Arabic</option><option>Finnish</option><option>Norwegian</option><option>Danish</option><option>Other</option></select></div>
+            <div class="field"><label for="qAge">Best for</label><select id="qAge"><option value="everyone">Everyone</option><option value="kids">Kids</option><option value="teens">Teens</option><option value="adults">Adults</option></select></div>
+          </div>
+          <fieldset class="vis"><legend>Who can see it?</legend>
+            <label><input type="radio" name="vis" value="private" checked><span><strong>Private</strong> Only you. You can still host it.</span></label>
+            <label><input type="radio" name="vis" value="unlisted"><span><strong>Unlisted</strong> Anyone with the link can host or copy it.</span></label>
+            <label><input type="radio" name="vis" value="public"><span><strong>Public</strong> In the Kalakal library for everyone. Answers stay hidden on its page.</span></label>
+          </fieldset>
+          <div class="row"><button class="btn btn-primary btn-sm" type="button" id="saveQuiz">Save to My quizzes</button><span class="muted" style="font-size: 15px">Sign in with Google to save. Players never need an account.</span></div>
+        </div>
+      </details>
       <div class="card stack" style="gap: 12px">
         <p class="eyebrow">Fast ways to add questions</p>
         <div class="fast">

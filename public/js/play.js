@@ -128,6 +128,8 @@ function question(m) {
   currentQ = m.index;
   $("#qCount").textContent = `${m.index + 1} / ${m.total}`;
   $("#qText").textContent = m.text;
+  const img = $("#qImg");
+  if (m.media && m.media.kind === "image") { img.src = m.media.src; img.hidden = false; } else { img.hidden = true; img.removeAttribute("src"); }
   $("#qX2").hidden = !(m.points === 2 || m.points === 0);
   $("#qX2").textContent = m.points === 2 ? "Double points!" : "Warm-up: no points";
   if (m.alreadyAnswered) { locked(null); return; }

@@ -5,6 +5,11 @@
   "compatibility_date": "2025-09-01",
   "assets": { "directory": "./public" },
   "ai": { "binding": "AI" },
+  // Accounts, saved quizzes and the library. Cloudflare creates the database on the first deploy.
+  "d1_databases": [{ "binding": "DB", "database_name": "kalakal-db" }],
+  // Picture storage (R2): uncomment after switching R2 on in the Cloudflare dashboard (R2 → Get started).
+  // Without it, uploaded pictures stay in the host's browser and show on the big screen only.
+  // "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "kalakal-media" }],
   "durable_objects": {
     "bindings": [
       { "name": "ROOMS", "class_name": "GameRoom" },
@@ -20,7 +25,9 @@
   // "npm run dev:ai" uses the real model and needs "npx wrangler login".
   "env": {
     "local": {
-      "vars": { "AI_MOCK": "1" },
+      "vars": { "AI_MOCK": "1", "DEV_LOGIN": "1", "ADMIN_EMAILS": "admin@test.local" },
+      "d1_databases": [{ "binding": "DB", "database_name": "kalakal-db", "database_id": "local-dev" }],
+      "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "kalakal-media" }],
       "durable_objects": {
         "bindings": [
           { "name": "ROOMS", "class_name": "GameRoom" },

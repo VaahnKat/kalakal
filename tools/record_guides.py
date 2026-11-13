@@ -34,7 +34,7 @@ OVERLAY = """
     @keyframes kkring { from { opacity: 1; transform: scale(.4); } to { opacity: 0; transform: scale(1.4); } }
     #kk-cap { position: fixed; z-index: 99997; left: 50%; bottom: 22px; transform: translateX(-50%); max-width: 92%;
       background: #FFB627; color: #160B2A; font: 800 22px Catamaran, system-ui, sans-serif; padding: 10px 22px;
-      border-radius: 99px; box-shadow: 0 8px 30px rgba(0,0,0,.45); white-space: nowrap; }
+      border-radius: 99px; box-shadow: 0 8px 30px rgba(0,0,0,.45); white-space: nowrap; pointer-events: none; }
     #kk-cap:empty { display: none; }`;
   document.head.appendChild(st);
   const c = document.createElement('div'); c.id = 'kk-cur';
@@ -280,7 +280,7 @@ async def rec_media(ctx, browser):
     await phone.goto(f"{BASE}/play.html?pin={pin}"); await phone.fill("#nick", "Malli"); await phone.click("#joinBtn")
     await page.wait_for_timeout(900); await r.ready()
     await page.click("#startBtn"); await page.wait_for_timeout(4200); await r.ready()
-    await page.evaluate("document.getElementById('kk-cap').textContent = 'Phones show the answer buttons'")
+    await page.evaluate("document.getElementById('kk-cap').textContent = 'Save the quiz and phones show it too'")
     await r.shot(2600)
     await phone.close()
     r.save("media")

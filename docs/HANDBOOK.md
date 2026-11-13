@@ -107,11 +107,10 @@ Kalakal/
 ## 3. How it works
 
 ```
- Phones (play.html) ──┐                         ┌── Durable Object "GameRoom"
-                      ├── WebSocket /ws/:pin ───┤   one per PIN, holds the game in memory,
- Big screen (host.html)┘                         │   scores, timers, results
-                                                 │
- Browser ── POST /api/games ── Worker (src/index.js) ── creates a room, returns PIN + host key
+Phones (play.html)     ──┐
+                         ├── WebSocket ──> GameRoom (one per PIN: players, scores, timers)
+Big screen (host.html) ──┘
+Host browser ── POST /api/games ──> Worker (src/index.js) ──> new room, PIN + host key
 ```
 
 1. The host picks a session and the browser sends it to `POST /api/games`. The server checks it, creates a room with a random 6-digit PIN and returns a secret **host key** (kept in the host's browser, so only that browser can control the game).

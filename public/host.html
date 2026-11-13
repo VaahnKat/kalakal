@@ -49,6 +49,8 @@
   .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 22px; }
   .mode { background: var(--night); border-radius: 28px; padding: 30px; display: flex; flex-direction: column; gap: 16px; border-top: 8px solid var(--marigold); }
   .mode-kural { border-top-color: var(--teal); }
+  .mode { position: relative; }
+  .mode-mascot { position: absolute; right: 18px; top: -46px; width: 150px; }
   .mode-head { display: flex; align-items: center; gap: 16px; }
   .mode-head h2 { font-size: 28px; }
   .mode-icon { width: 60px; height: 60px; border-radius: 18px; background: var(--marigold); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -100,8 +102,9 @@
         <h1 style="font-size: clamp(32px, 4vw, 48px)">What do you want to run?</h1>
         <p class="muted">Two ways to light up a room. Players join both the same way: a PIN on their phone.</p>
       </div>
-      <div class="modes">
+      <div class="modes" style="padding-top: 30px">
         <article class="mode mode-play">
+          <img class="mascot float mode-mascot" src="/img/mascots/host.webp" alt="" width="150" height="137">
           <div class="mode-head">
             <div class="mode-icon"><svg aria-hidden="true" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#160B2A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 L4 14 h7 l-1 8 9-12 h-7 z"/></svg></div>
             <div><p class="eyebrow" style="color: var(--marigold)">Kalakal Play</p><h2>Quiz games</h2></div>
@@ -116,6 +119,7 @@
           <p class="muted" style="font-size: 15px" id="demoTitle"></p>
         </article>
         <article class="mode mode-kural">
+          <img class="mascot float mode-mascot" src="/img/mascots/explorer.webp" alt="" width="118" height="124" style="top: -100px; right: 4px">
           <div class="mode-head">
             <div class="mode-icon"><svg aria-hidden="true" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#160B2A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5 h16 v11 h-9 l-5 4 v-4 h-2 z"/><path d="M8 10 h8"/></svg></div>
             <div><p class="eyebrow" style="color: var(--teal)">Kalakal Kural</p><h2>Live polls &amp; feedback</h2></div>
@@ -164,7 +168,7 @@
       <div class="players">
         <div class="row" style="justify-content: space-between">
           <div class="row"><h2 style="font-size: 30px">Players</h2><span class="pill" id="pCount">0</span></div>
-          <div class="float" id="lobbyMinni"></div>
+          <img class="mascot float" id="lobbyMinni" src="/img/mascots/host.webp" alt="Kalakal quiz-show host" width="130" height="118">
         </div>
         <p class="muted" id="kickHint" hidden>Tap a name to remove a player.</p>
         <div class="chips" id="chips"><p class="muted" id="emptyHint">Waiting for players to join…</p></div>
@@ -210,7 +214,7 @@
 <!-- 6. Podium -->
 <section class="screen" data-screen="podium" hidden>
   <div class="wrap stage">
-    <div style="text-align: center; padding-top: 24px" class="stack"><p class="eyebrow">Final results</p><h1 style="font-size: clamp(36px, 5vw, 60px)">Kalakal!</h1></div>
+    <div style="padding-top: 18px; display: flex; align-items: center; justify-content: center; gap: 32px"><img class="mascot pop-in" src="/img/mascots/champion.webp" alt="Kalakal champion mascot" width="140" height="125"><div class="stack" style="gap: 4px; text-align: center"><p class="eyebrow">Final results</p><h1 style="font-size: clamp(36px, 5vw, 60px)">Kalakal!</h1></div></div>
     <div class="podium" id="podium"></div>
     <div class="footer-bar"><button class="btn btn-ghost btn-sm" type="button" id="csvBtn">Download results (CSV)</button><a class="btn btn-primary" href="/host.html">New game</a></div>
   </div>
@@ -230,7 +234,7 @@
 <!-- 8. Session finished (no quiz questions) -->
 <section class="screen" data-screen="finished" hidden>
   <div class="wrap stage" style="align-items: center; justify-content: center; text-align: center">
-    <div id="finMinni" class="float"></div>
+    <img class="mascot pop-in" src="/img/mascots/explorer.webp" alt="Kalakal explorer mascot" width="240" height="160">
     <h1 style="font-size: clamp(34px, 5vw, 56px)">Thanks, everyone!</h1>
     <p class="muted" id="finText"></p>
     <div class="row" style="justify-content: center"><button class="btn btn-ghost btn-sm" type="button" id="finCsv">Download results (CSV)</button><a class="btn btn-primary" href="/host.html">New session</a></div>

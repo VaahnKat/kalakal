@@ -16,7 +16,6 @@ let builderMode = "play";
 
 $("#demoTitle").textContent = `${DEMO_QUIZ.title}: Sweden, Tamil culture and general knowledge.`;
 $("#meetTitle").textContent = "Word cloud, poll, team-health scale, open ideas and live Q&A.";
-$("#lobbyMinni").innerHTML = minni("ready", 90);
 $("#qMinni").innerHTML = minni("ready", 130);
 
 // ---------- setup ----------
@@ -292,7 +291,6 @@ function podium(m) {
 }
 
 function finished(m) {
-  $("#finMinni").innerHTML = minni("happy", 150);
   $("#finText").textContent = `${m.players} ${m.players === 1 ? "person" : "people"} took part. Download the results to keep everyone's input.`;
   show("finished");
   confetti(100);

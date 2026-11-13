@@ -1,4 +1,4 @@
-import { SHAPES, SHAPE_NAMES, minni, esc, $, show, connect, startTimer, confetti } from "/js/common.js";
+import { SHAPES, SHAPE_NAMES, esc, $, show, connect, startTimer, confetti } from "/js/common.js";
 import { DEMO_QUIZ, DEMO_MEETING, SLIDE_TYPES, TYPE_LABEL, blankSlide } from "/js/quizzes.js";
 import { avatarSvg } from "/js/avatar.js";
 
@@ -16,7 +16,9 @@ let builderMode = "play";
 
 $("#demoTitle").textContent = `${DEMO_QUIZ.title}: Sweden, Tamil culture and general knowledge.`;
 $("#meetTitle").textContent = "Word cloud, poll, team-health scale, open ideas and live Q&A.";
-$("#qMinni").innerHTML = minni("ready", 130);
+const M = (name, w, alt = "") => `<img class="mascot" src="/img/mascots/${name}.webp" alt="${alt}" width="${w}" style="height:auto">`;
+["host-thinking","host-surprised","host-happy","explorer-thinking"].forEach((n) => { new Image().src = `/img/mascots/${n}.webp`; });
+$("#qMinni").innerHTML = M("host-thinking", 130);
 
 // ---------- setup ----------
 $("#playDemo").addEventListener("click", () => createGame(DEMO_QUIZ, $("#setupErr")));
@@ -221,11 +223,11 @@ function question(m) {
   $("#qTitle").textContent = m.text;
   $("#qAnswers").innerHTML = answerTiles(m.answers);
   $("#answered").textContent = `${m.answered || 0} of ${m.players} answered`;
-  $("#qMinni").innerHTML = minni("ready", 130);
+  $("#qMinni").innerHTML = M("host-thinking", 130, "Host is thinking");
   stopTimer && stopTimer();
   stopTimer = startTimer($("#timer"), m.time * 1000, m.remaining, null);
   clearTimeout(question.hurry);
-  question.hurry = setTimeout(() => { $("#qMinni").innerHTML = minni("hurry", 130); }, Math.max(0, m.remaining - 5000));
+  question.hurry = setTimeout(() => { $("#qMinni").innerHTML = M("host-surprised", 130, "Hurry!"); }, Math.max(0, m.remaining - 5000));
   show("question");
 }
 
@@ -244,6 +246,7 @@ function reveal(m) {
   $("#rTitle").textContent = m.text;
   $("#bars").innerHTML = barsHtml(m.answers, m.counts, m.correct);
   document.querySelectorAll("#bars .bar").forEach((b) => (b.style.width = "0"));
+  $("#rMascot").innerHTML = M("host-happy", 76, "");
   show("reveal");
   requestAnimationFrame(() => requestAnimationFrame(() => document.querySelectorAll("#bars .bar").forEach((b) => (b.style.width = `max(48px, ${b.dataset.w}%)`))));
 }
@@ -364,7 +367,7 @@ function renderResults() {
 }
 
 function waiting() {
-  return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;height:100%;min-height:220px"><div class="float">${minni("ready", 110)}</div><p class="muted">Waiting for the first answers…</p></div>`;
+  return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;height:100%;min-height:220px"><div class="float">${M("explorer-thinking", 110, "")}</div><p class="muted">Waiting for the first answers…</p></div>`;
 }
 function hiddenList(hidden) {
   if (!hidden.length) return "";
@@ -403,7 +406,7 @@ $("#csvBtn").addEventListener("click", downloadCsv);
 $("#finCsv").addEventListener("click", downloadCsv);
 
 function message(title, text, mood, withNext = false) {
-  $("#msgMinni").innerHTML = minni(mood, 130);
+  $("#msgMinni").innerHTML = M(mood === "sad" ? "host-surprised" : "host-happy", 120, "");
   $("#msgTitle").textContent = title; $("#msgText").textContent = text;
   $("#msgNext").hidden = !withNext;
   show("message");

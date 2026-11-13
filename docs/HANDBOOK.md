@@ -132,9 +132,9 @@ Host browser ── POST /api/games ──> Worker (src/index.js) ──> new ro
 
 | From → to | Messages |
 |---|---|
-| Host → server | `host_hello`, `start`, `next`, `skip`, `kick`, `lock`, `fun_names`, `hide`, `answered`, `end` |
+| Host → server | `host_hello`, `start`, `next`, `skip`, `kick`, `lock`, `fun_names`, `hide`, `answered`, `update_quiz` (lobby only), `end` |
 | Player → server | `join`, `answer`, `respond`, `avatar` |
-| Server → host | `snapshot`, `lobby`, `question`, `answer_count`, `reveal`, `leaderboard`, `engage`, `results`, `podium`, `finished` |
+| Server → host | `snapshot` (includes the quiz), `quiz_updated`, `update_error`, `lobby`, `question`, `answer_count`, `reveal`, `leaderboard`, `engage`, `results`, `podium`, `finished` |
 | Server → player | `joined`, `lobby_wait`, `question`, `answer_ack`, `result`, `final`, `engage`, `respond_ack`, `respond_error`, `qa_list`, `thanks`, `kicked`, `between` |
 
 API: `POST /api/games` → `{pin, hostKey}` · `GET /api/games/:pin` → `{exists, phase, locked, funNames, players}` · `GET /ws/:pin?role=host|player`.
@@ -167,6 +167,8 @@ Each recipe says which file to open and what to change. After any change: test l
 | Change the AI prompt | `public/js/quicktype.js` | `aiPrompt` |
 | Change picture size limits | `public/js/media.js` | `MAX_SIDE`, `TARGET_BYTES`, GIF limit in `compressImage` |
 | Edit the guide page or FAQ | `public/create.html` | Plain HTML; each way is a `<section class="way">`, each FAQ a `<details>` |
+| Change the invite text or share buttons | `public/js/host.js` | `invite()` and `setupShare()`; buttons in the lobby in `public/host.html` (`.share`) |
+| Change how editing a live game works | `public/js/host.js` (`editQuizBtn`, `quizToDraft`) and `src/index.js` (`update_quiz`, lobby only) |
 | Re-record the step GIFs after a UI change | `tools/record_guides.py` | `npm run dev`, then `npm run guides` (or `python3 tools/record_guides.py paste` for one) |
 
 How pictures work today: uploads are shrunk in the browser and saved with the draft (browser storage, ~5 MB in total). During a game they stay in the host's tab and show on the big screen only; phones get just the answers. Server storage (Cloudflare R2) comes with accounts.
@@ -354,6 +356,8 @@ Cloudflare → Workers & Pages → kalakal → Deployments → choose an earlier
 **Milestones** (animated on phones, pop-ups on the big screen): on fire at 3, 5, 7, 10 in a row (then every 5) · took the lead · entered the top 3 · comeback · perfect game. Rank-based milestones start after the first question.
 
 **Pulse:** anonymous on screen. Poll votes can be changed. Word cloud merges the same word in any case. Q&A upvotes toggle and you cannot upvote your own question. The host can hide any text and mark questions answered.
+
+**Editing and inviting:** questions and right answers can be edited in the AI review window, in the editor, and from the lobby (**Edit questions**) until the game starts; the PIN stays the same and waiting players stay. Ready-made quizzes have "edit first" links. The lobby has Share invite (device share menu), WhatsApp and Copy link; the link is `/play.html?pin=123456`, so players only type a name.
 
 **Safety:** nickname and text filter, duplicate names get a number, one answer per question, host-only controls via the secret host key, host can remove players and lock the lobby, "fun names only" switch.
 

@@ -75,5 +75,36 @@ ok(`double points: ${single} and ${dbl} (normal max is 1,000 + streak)`);
 if (r(first)[2].points !== 0 || !r(first)[2].noPoints || !r(first)[2].correct) fail("warm-up scored");
 if (r(third)[2].streak !== r(third)[1].streak) fail("warm-up changed the streak");
 ok("no-points warm-up: right answer, 0 points, streak unchanged");
+// ---- editing a game in the lobby ----
+{
+  const q1 = { title: "Before", questions: [{ type: "quiz", text: "Old?", answers: ["A", "B"], correct: 0, time: 5 }] };
+  const g = await fetch(`${BASE}/api/games`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ quiz: q1 }) }).then((r) => r.json());
+  const hws = await socket(`${WS}/ws/${g.pin}?role=host`); const HM = [];
+  hws.onmessage = (e) => HM.push(JSON.parse(e.data)); hws.send(JSON.stringify({ t: "host_hello", key: g.hostKey }));
+  await sleep(300);
+  const snap = HM.find((m) => m.t === "snapshot");
+  if (!snap || !snap.quiz || snap.quiz.questions[0].text !== "Old?") fail("host snapshot missing the quiz");
+  const pl = await socket(`${WS}/ws/${g.pin}?role=player`); const PM = [];
+  pl.onmessage = (e) => PM.push(JSON.parse(e.data)); pl.send(JSON.stringify({ t: "join", name: "Waiting", avatar: 3 }));
+  await sleep(300);
+  hws.send(JSON.stringify({ t: "update_quiz", quiz: { title: "After", questions: [{ type: "quiz", text: "New?", answers: ["A", "B", "C"], correct: [2], time: 10 }, { type: "poll", text: "Snack?", answers: ["X", "Y"] }] } }));
+  await sleep(300);
+  const up = HM.find((m) => m.t === "quiz_updated");
+  if (!up || up.quiz.title !== "After" || JSON.stringify(up.quiz.questions[0].correct) !== "[2]") fail("quiz not updated " + JSON.stringify(up));
+  hws.send(JSON.stringify({ t: "update_quiz", quiz: { title: "Bad", questions: [{ type: "quiz", text: "x", answers: ["only"], correct: 0 }] } }));
+  await sleep(200);
+  if (!HM.some((m) => m.t === "update_error")) fail("invalid edit accepted");
+  const st = await fetch(`${BASE}/api/games/${g.pin}`).then((r) => r.json());
+  if (st.players !== 1 && !(Array.isArray(st.players) && st.players.length === 1)) fail("player lost after edit " + JSON.stringify(st));
+  hws.send(JSON.stringify({ t: "start" })); await sleep(300);
+  const q = PM.find((m) => m.t === "question");
+  if (!q || q.text !== "New?" || q.answers.length !== 3) fail("game didn't use the edited quiz");
+  const before = HM.filter((m) => m.t === "update_error").length;
+  hws.send(JSON.stringify({ t: "update_quiz", quiz: { title: "Late", questions: [{ type: "quiz", text: "x?", answers: ["a", "b"], correct: 0 }] } }));
+  await sleep(200);
+  if (HM.filter((m) => m.t === "update_error").length !== before + 1) fail("edit allowed after start");
+  ok("host can edit questions and right answers in the lobby; players stay; edits are refused once the game starts");
+  hws.close(); pl.close();
+}
 console.log("PASS: question features");
 process.exit(0);

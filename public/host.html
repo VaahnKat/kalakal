@@ -50,6 +50,22 @@
   .media-stage { display: flex; align-items: center; justify-content: center; gap: 24px; width: 100%; }
   .q-media { max-width: min(100%, 900px); max-height: 38vh; border-radius: 18px; filter: drop-shadow(0 10px 30px rgba(0,0,0,.35)); object-fit: contain; }
   .q-video { width: min(100%, 68vh); aspect-ratio: 16 / 9; height: auto; border: 0; }
+  .share { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); padding-top: 16px; }
+  .share-link { font-size: 15px; color: var(--soft); word-break: break-all; }
+  .btn-wa { background: #25D366; color: #08281A; }
+  .btn-wa:hover { filter: brightness(1.05); color: #08281A; }
+  .link-btn { background: none; border: 0; color: var(--soft); font: 700 15px var(--body); text-decoration: underline; cursor: pointer; padding: 6px 0; align-self: flex-start; min-height: 44px; }
+  .link-btn:hover { color: var(--cream); }
+  .live-edit { background: rgba(25,211,197,.12); border: 1px solid var(--teal); border-radius: 14px; padding: 12px 16px; margin-bottom: 16px; font-weight: 700; }
+  .ai-ans button { border-radius: 99px; padding: 3px 12px; font: 15px var(--body); background: var(--night); border: 1px solid var(--line); color: var(--soft); cursor: pointer; min-height: 32px; }
+  .ai-ans button.r { background: var(--teal); border-color: var(--teal); color: var(--ink); font-weight: 800; }
+  .ai-ans button:hover { border-color: var(--mist); }
+  .ai-edit { display: flex; flex-direction: column; gap: 8px; padding-left: 34px; }
+  .ai-edit input[type=text] { min-height: 42px; }
+  .ai-edit-row { display: flex; gap: 8px; align-items: center; }
+  .ai-edit-row input { flex: 1; }
+  .ai-edit-row .mark { background: var(--night); border-color: var(--line); color: var(--soft); }
+  .ai-edit-row .mark[aria-pressed="true"] { background: var(--teal); border-color: var(--teal); color: var(--ink); }
   .ai-btn { background: linear-gradient(90deg, var(--marigold), var(--coral)); }
   .ai-btn span { margin-right: 4px; }
   dialog.ai { width: min(920px, 94vw); }
@@ -169,6 +185,7 @@
             <button class="btn btn-primary" type="button" id="playDemo">Play the warm-up quiz</button>
             <button class="btn btn-ghost" type="button" id="buildPlay">Build a quiz</button>
           </div>
+          <button class="link-btn" type="button" id="editDemo">Or edit the warm-up quiz first</button>
           <p class="muted" style="font-size: 15px" id="demoTitle"></p>
         </article>
         <article class="mode mode-kural">
@@ -184,6 +201,7 @@
             <button class="btn btn-teal" type="button" id="playMeeting">Run the meeting warm-up</button>
             <button class="btn btn-ghost" type="button" id="buildKural">Build a session</button>
           </div>
+          <button class="link-btn" type="button" id="editMeeting">Or edit the meeting warm-up first</button>
           <p class="muted" style="font-size: 15px" id="meetTitle"></p>
         </article>
       </div>
@@ -198,6 +216,7 @@
   <div class="wrap">
     <nav class="h-nav"><a class="brand" href="/"><img src="/img/icon.svg" alt="">kalakal</a><button class="btn btn-ghost btn-sm" type="button" id="backToSetup">Back</button></nav>
     <div class="row" style="padding-bottom: 18px"><span class="mode-chip" id="builderMode"></span><span class="muted" id="builderHint"></span></div>
+    <p class="live-edit" id="liveEdit" hidden></p>
     <div class="stack" style="padding-bottom: 120px">
       <div class="field"><label for="quizTitle">Session title</label><input id="quizTitle" type="text" maxlength="80" placeholder="Friday team session"></div>
       <div class="card stack" style="gap: 12px">
@@ -230,6 +249,15 @@
         <div><p class="muted" style="font-size: 20px; font-weight: 600">Join at</p><p style="font-family: var(--display); font-weight: 800; font-size: clamp(26px, 3vw, 38px); word-break: break-all" id="joinHost"></p></div>
         <div><p class="muted" style="font-size: 20px; font-weight: 600">Game PIN</p><p class="big-pin" id="bigPin"></p></div>
         <div class="row" style="flex-wrap: nowrap; gap: 18px"><div class="qr" id="qr" role="img" aria-label="QR code to join the game"></div><p class="muted" style="font-size: 19px">Or scan with your phone camera. No app needed.</p></div>
+        <div class="share">
+          <p class="muted" style="font-weight: 700">Invite people: the link opens the game with the PIN filled in</p>
+          <div class="row">
+            <button class="btn btn-primary btn-sm" type="button" id="shareBtn" hidden>Share invite</button>
+            <a class="btn btn-wa btn-sm" id="waBtn" target="_blank" rel="noopener">WhatsApp</a>
+            <button class="btn btn-ghost btn-sm" type="button" id="copyLink">Copy link</button>
+          </div>
+          <p class="share-link" id="shareLink"></p>
+        </div>
       </div>
       <div class="players">
         <div class="row" style="justify-content: space-between">
@@ -239,7 +267,7 @@
         <p class="muted" id="kickHint" hidden>Tap a name to remove a player.</p>
         <div class="chips" id="chips"><p class="muted" id="emptyHint">Waiting for players to join…</p></div>
         <div class="footer-bar">
-          <div class="row"><button class="btn btn-ghost btn-sm" type="button" id="lockBtn">Lock lobby</button><button class="btn btn-ghost btn-sm" type="button" id="funBtn" aria-pressed="false">Fun names only: off</button></div>
+          <div class="row"><button class="btn btn-ghost btn-sm" type="button" id="editQuizBtn">Edit questions</button><button class="btn btn-ghost btn-sm" type="button" id="lockBtn">Lock lobby</button><button class="btn btn-ghost btn-sm" type="button" id="funBtn" aria-pressed="false">Fun names only: off</button></div>
           <button class="btn btn-primary" type="button" id="startBtn" disabled>Start game</button>
         </div>
       </div>
@@ -345,7 +373,7 @@
   </div>
   <div class="stack" style="gap: 14px" id="aiReview" hidden>
     <div class="row" style="justify-content: space-between"><h2 style="font-size: 26px">Check your questions</h2><button class="icon-btn" type="button" data-ai="close" aria-label="Close">Close</button></div>
-    <p class="ai-warn"><strong>AI can be wrong.</strong> Read each right answer (in green) before you play. Untick a question to leave it out, or ask for a new version.</p>
+    <p class="ai-warn"><strong>AI can be wrong.</strong> Check each right answer (in green). <strong>Tap an answer</strong> to mark it right, press <strong>Edit</strong> to change the words, or untick a question to leave it out.</p>
     <div class="ai-list" id="aiList"></div>
     <p class="error" id="aiReviewErr" role="alert" hidden></p>
     <div class="row" style="justify-content: space-between"><button class="btn btn-ghost btn-sm" type="button" id="aiBack">Change settings</button><button class="btn btn-primary" type="button" id="aiAdd">Add to quiz</button></div>

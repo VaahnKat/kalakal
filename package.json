@@ -1,6 +1,6 @@
 {
   "name": "kalakal",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "description": "Kalakal - live quizzes, polls and games anyone can join with a PIN",
   "scripts": {

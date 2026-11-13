@@ -28,13 +28,19 @@ $("#playDemo").addEventListener("click", () => createGame(DEMO_QUIZ, $("#setupEr
 $("#playMeeting").addEventListener("click", () => createGame(DEMO_MEETING, $("#setupErr")));
 $("#buildPlay").addEventListener("click", () => openBuilder("play"));
 $("#buildKural").addEventListener("click", () => openBuilder("kural"));
-$("#backToSetup").addEventListener("click", () => show("setup"));
+$("#backToSetup").addEventListener("click", () => {
+  if (editingPin) { editingPin = null; show("lobby"); } else show("setup");
+});
 
 // One draft per mode, kept in this browser
 if (localStorage.getItem("kalakal:draft") && !localStorage.getItem("kalakal:draft:play")) localStorage.setItem("kalakal:draft:play", localStorage.getItem("kalakal:draft"));
 let draft = null;
+let editingPin = null;     // set while editing a live game's questions from the lobby
+let currentQuiz = null;    // the quiz the server has for this game
+let pendingMedia = null;
+const draftKey = () => (editingPin ? "kalakal:draft:game:" + editingPin : "kalakal:draft:" + builderMode);
 function saveDraft() {
-  try { localStorage.setItem("kalakal:draft:" + builderMode, JSON.stringify(draft)); $("#draftNote").textContent = "Draft saved in this browser"; }
+  try { localStorage.setItem(draftKey(), JSON.stringify(draft)); $("#draftNote").textContent = "Draft saved in this browser"; }
   catch { $("#draftNote").textContent = "Too big to save in this browser: use picture links instead of uploads for some questions."; }
 }
 // Older drafts stored one correct answer as a number
@@ -47,9 +53,33 @@ function tidy(q) {
   return q;
 }
 
-function openBuilder(mode) {
+// A game's quiz (as the server keeps it) back into editor form
+function quizToDraft(quiz, media = []) {
+  return {
+    title: quiz.title || "",
+    questions: quiz.questions.map((q, i) => {
+      if (q.type === "quiz") {
+        const tf = q.answers.length === 2 && /^true$/i.test(q.answers[0]) && /^false$/i.test(q.answers[1]);
+        const out = { type: "quiz", text: q.text, answers: tf ? q.answers.slice() : [...q.answers, "", "", ""].slice(0, 4), correct: (Array.isArray(q.correct) ? q.correct : [q.correct]).slice(), time: q.time || 20, points: q.points ?? 1 };
+        if (tf) out.tf = true;
+        if (media[i]) out.media = media[i];
+        return out;
+      }
+      if (q.type === "poll") return { type: "poll", text: q.text, answers: [...q.answers, "", "", ""].slice(0, 4) };
+      if (q.type === "scale") return { type: "scale", text: q.text, statements: q.statements.slice(), low: q.low, high: q.high };
+      return { type: q.type, text: q.text };
+    }),
+  };
+}
+
+function openBuilder(mode, preset = null) {
   builderMode = mode;
-  draft = JSON.parse(localStorage.getItem("kalakal:draft:" + mode) || "null") || { title: "", questions: [blankSlide(mode === "play" ? "quiz" : "poll")] };
+  draft = preset || JSON.parse(localStorage.getItem(draftKey()) || "null") || { title: "", questions: [blankSlide(mode === "play" ? "quiz" : "poll")] };
+  if (preset) saveDraft();
+  $("#liveEdit").hidden = !editingPin;
+  $("#liveEdit").textContent = editingPin ? `Editing the live game · PIN ${editingPin.replace(/(\d{3})(\d{3})/, "$1 $2")}. Players stay in the lobby. Press Save when you're done.` : "";
+  $("#playCustom").textContent = editingPin ? "Save and back to lobby" : "Create game";
+  $("#backToSetup").textContent = editingPin ? "Back to lobby" : "Back";
   draft.questions.forEach((q) => { if (!q.type) q.type = "quiz"; tidy(q); });
   $("#builderMode").textContent = mode === "play" ? "Kalakal Play · Quiz game" : "Kalakal Pulse · Live polls & feedback";
   $("#builderMode").className = "mode-chip " + (mode === "kural" ? "kural" : "");
@@ -289,7 +319,9 @@ $("#playCustom").addEventListener("click", () => {
     } else out.push({ type: q.type, text });
   }
   if (!out.length) return fail("Add at least one slide.");
-  createGame({ title: draft.title.trim() || (builderMode === "play" ? "My Kalakal quiz" : "My Kalakal session"), questions: out }, err, media);
+  const quiz = { title: draft.title.trim() || (builderMode === "play" ? "My Kalakal quiz" : "My Kalakal session"), questions: out };
+  if (editingPin) { pendingMedia = media; $("#playCustom").disabled = true; conn.send({ t: "update_quiz", quiz }); return; }
+  createGame(quiz, err, media);
   function fail(t) { err.textContent = t; err.hidden = false; }
 });
 
@@ -303,12 +335,51 @@ async function createGame(quiz, errEl, media = []) {
     if (!res.ok) throw new Error(data.error || "Could not create the game");
     localStorage.setItem("kalakal:host:" + data.pin, data.hostKey);
     pin = data.pin;
-    mediaList = media;
+    mediaList = media; currentQuiz = quiz;
     try { sessionStorage.setItem("kalakal:media:" + pin, JSON.stringify(media)); } catch { /* too big to keep across a refresh */ }
     history.replaceState(null, "", "/host.html?pin=" + pin);
     openGame();
   } catch (e) { errEl.textContent = e.message; errEl.hidden = false; }
 }
+
+// Edit the questions of a game that is waiting in the lobby
+$("#editQuizBtn").addEventListener("click", () => {
+  if (!currentQuiz) return;
+  editingPin = pin; $("#editErr").hidden = true;
+  openBuilder(currentQuiz.questions.some((q) => q.type === "quiz") ? "play" : "kural", quizToDraft(currentQuiz, mediaList));
+  window.scrollTo(0, 0);
+});
+// Start from a ready-made quiz and change it
+function editReady(quiz, mode) {
+  try {
+    const cur = JSON.parse(localStorage.getItem("kalakal:draft:" + mode) || "null");
+    if (cur && cur.questions.some((q) => (q.text || "").trim()) && !confirm("Replace the draft you're working on with this ready-made quiz?")) return;
+  } catch { /* no draft */ }
+  editingPin = null; openBuilder(mode, quizToDraft(quiz));
+}
+$("#editDemo").addEventListener("click", () => editReady(DEMO_QUIZ, "play"));
+$("#editMeeting").addEventListener("click", () => editReady(DEMO_MEETING, "kural"));
+
+// ---------- invite links ----------
+function invite() {
+  const url = `${location.origin}/play.html?pin=${pin}`;
+  const kind = currentQuiz && !currentQuiz.questions.some((q) => q.type === "quiz") ? "session" : "quiz";
+  const title = currentQuiz && currentQuiz.title ? ` “${currentQuiz.title}”` : "";
+  return { url, text: `Join my Kalakal ${kind}${title}! Tap the link to join (game PIN ${pin.replace(/(\d{3})(\d{3})/, "$1 $2")}):` };
+}
+function setupShare() {
+  const { url, text } = invite();
+  $("#shareLink").textContent = url.replace(/^https?:\/\//, "");
+  $("#waBtn").href = "https://wa.me/?text=" + encodeURIComponent(`${text} ${url}`);
+  $("#shareBtn").hidden = !navigator.share;
+}
+$("#shareBtn").addEventListener("click", () => { const { url, text } = invite(); navigator.share({ title: "Kalakal", text, url }).catch(() => {}); });
+$("#copyLink").addEventListener("click", async () => {
+  const { url, text } = invite(), b = $("#copyLink");
+  try { await navigator.clipboard.writeText(`${text} ${url}`); b.textContent = "Copied!"; }
+  catch { window.prompt("Copy this invite:", `${text} ${url}`); }
+  setTimeout(() => (b.textContent = "Copy link"), 2500);
+});
 
 // ---------- live session ----------
 function openGame() {
@@ -320,19 +391,30 @@ function openGame() {
   $("#eJoin").textContent = `Join at ${location.host} · PIN ${pin.replace(/(\d{3})(\d{3})/, "$1 $2")}`;
   const joinUrl = `${location.origin}/play.html?pin=${pin}`;
   try { const qr = qrcode(0, "M"); qr.addData(joinUrl); qr.make(); $("#qr").innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch (e) { console.error(e); }
+  setupShare();
   conn = connect(pin, "host", { onOpen: () => conn.send({ t: "host_hello", key }), onMessage });
 }
 
 function onMessage(m) {
   switch (m.t) {
     case "snapshot":
-      $("#lobbyTitle").textContent = m.title;
+      $("#lobbyTitle").textContent = m.title; currentQuiz = m.quiz || currentQuiz; setupShare();
       players = m.players; locked = m.locked; funNamesOn = !!m.funNames; renderLobby();
       if (m.phase === "lobby") show("lobby");
       else if (m.phase === "question") question({ ...m.question, total: m.total, players: players.length });
       else if (m.phase === "engage") engageStart(m.engage);
       else if (m.phase === "podium" || m.phase === "finished") conn.send({ t: "end" });
       else message("Session in progress", "Continue to the next screen.", "ready", true);
+      break;
+    case "quiz_updated":
+      currentQuiz = m.quiz; mediaList = pendingMedia || [];
+      try { sessionStorage.setItem("kalakal:media:" + pin, JSON.stringify(mediaList)); } catch { /* too big */ }
+      try { localStorage.removeItem("kalakal:draft:game:" + pin); } catch { /* ignore */ }
+      editingPin = null; $("#playCustom").disabled = false;
+      $("#lobbyTitle").textContent = m.quiz.title; setupShare(); show("lobby");
+      break;
+    case "update_error":
+      $("#playCustom").disabled = false; $("#editErr").textContent = m.message; $("#editErr").hidden = false;
       break;
     case "lobby": players = m.players; locked = m.locked; funNamesOn = !!m.funNames; renderLobby(); if (engage) setCount(); break;
     case "question": engage = null; question(m); break;

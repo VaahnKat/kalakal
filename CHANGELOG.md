@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1 — 13 Nov 2026
+- Edit questions and right answers everywhere: AI review (tap an answer to mark it right, Edit to change wording), and **Edit questions** in the lobby for a created game (same PIN, players stay; locked once the game starts)
+- "Edit first" links for the ready-made quiz and meeting warm-up
+- Lobby invite: Share invite, WhatsApp and Copy link, with the PIN in the link
+- Two new FAQ answers on the guide page
+
 ## 0.6 — 13 Nov 2026
 - **Create with AI** in the quiz builder: topic, or your own notes / PDF / text file; 5–20 questions; difficulty, audience, language (English, Tamil, Swedish and more), time, optional true/false
 - Review before adding: untick questions; New question, Harder, Easier, Better wrong answers on any question

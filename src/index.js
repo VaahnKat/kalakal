@@ -278,6 +278,16 @@ export class GameRoom extends DurableObject {
         this.pushResults(true);
         break;
       }
+      case "update_quiz": {   // host edited the questions while players wait in the lobby
+        if (this.phase !== "lobby") { this.toHosts({ t: "update_error", message: "The game has started, so the questions can't be changed now." }); break; }
+        const v = validateSession(msg.quiz);
+        if (v.error) { this.toHosts({ t: "update_error", message: v.error }); break; }
+        this.setup.quiz = v.value;
+        this.ctx.storage.put("setup", this.setup);
+        this.toHosts({ t: "quiz_updated", quiz: this.setup.quiz });
+        this.broadcastLobby();
+        break;
+      }
       case "end":
         this.showEnd();
         break;
@@ -502,7 +512,7 @@ export class GameRoom extends DurableObject {
 
   hostSnapshot() {
     const players = [...this.players.values()].map((p) => ({ id: p.id, name: p.name, color: p.color, avatar: p.avatar, connected: p.connected }));
-    const snap = { t: "snapshot", pin: this.setup.pin, title: this.setup.quiz.title, total: this.slides.length, phase: this.phase, players, locked: this.locked, funNames: this.funNames, mode: this.hasQuiz ? "play" : "kural" };
+    const snap = { t: "snapshot", pin: this.setup.pin, title: this.setup.quiz.title, quiz: this.setup.quiz, total: this.slides.length, phase: this.phase, players, locked: this.locked, funNames: this.funNames, mode: this.hasQuiz ? "play" : "kural" };
     if (this.phase === "question") {
       const q = this.slide;
       snap.question = { index: this.qIndex, text: q.text, answers: q.answers, time: q.time, points: q.points, remaining: Math.max(0, q.time * 1000 - (Date.now() - this.qStartedAt)), answered: [...this.players.values()].filter((p) => p.answers[this.qIndex]).length };

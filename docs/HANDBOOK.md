@@ -89,7 +89,7 @@ Kalakal/
 │   ├── Originals/                     Full-size PNGs exactly as generated
 │   └── Expressions (cut out)/         Transparent PNGs of the 9 expressions
 └── 03 App releases/
-    └── kalakal-source-v0.4.zip        Snapshot of the code at this version
+    └── (release snapshots)            Code archives; GitHub holds the full history
 ```
 
 **Rule:** new artwork goes in Drive `02 Mascots/Originals` *and* in the repo `design/mascots/source`. The repo copy is what the build uses; Drive is the backup and the place to share with designers.
@@ -294,7 +294,7 @@ Cloudflare → Workers & Pages → kalakal → Deployments → choose an earlier
 
 1. Update `CHANGELOG.md` and the version in `package.json`.
 2. Commit and push; check the live site.
-3. Upload `kalakal-source-vX.Y.zip` to Drive `03 App releases` (`git archive -o kalakal-source-vX.Y.zip HEAD`).
+3. Optional: download the release ZIP from GitHub (Code → Download ZIP) and put it in Drive `03 App releases`.
 4. Update this handbook if anything in sections 2–6 changed, and copy it to the Drive Google Doc.
 
 ---

@@ -11,6 +11,8 @@
 //   qa        - audience asks questions and upvotes each other's
 
 import { DurableObject } from "cloudflare:workers";
+import { FUN_NAMES, funName } from "../public/js/names.js";
+import { AVATAR_COUNT } from "../public/js/avatar.js";
 
 const MAX_PLAYERS = 200;
 const MAX_SLIDES = 50;
@@ -102,6 +104,11 @@ function validateSession(q) {
   return { value: { title, questions: slides } };
 }
 
+function validAvatar(v) {
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 0 && n < AVATAR_COUNT ? n : Math.floor(Math.random() * AVATAR_COUNT);
+}
+
 function randomToken() {
   const b = crypto.getRandomValues(new Uint8Array(18));
   return btoa(String.fromCharCode(...b)).replace(/[+/=]/g, "");
@@ -126,6 +133,9 @@ export class GameRoom extends DurableObject {
     this.qStartedAt = 0;
     this.timer = null;
     this.locked = false;
+    this.funNames = false;    // players get a random fun name instead of typing one
+    this.quizDone = 0;        // quiz questions revealed so far
+    this.highlights = [];     // milestone moments from the last reveal (for the host)
     this.responses = {};       // slide index -> response store (interaction slides)
     this.pushTimer = null;
     this.ready = ctx.blockConcurrencyWhile(async () => {
@@ -146,14 +156,14 @@ export class GameRoom extends DurableObject {
       if (fresh) return new Response("PIN in use", { status: 409 });
       const { pin, quiz, hostKey } = await request.json();
       this.setup = { pin, quiz, hostKey, createdAt: Date.now() };
-      this.players.clear(); this.phase = "lobby"; this.qIndex = -1; this.locked = false; this.responses = {};
+      this.players.clear(); this.phase = "lobby"; this.qIndex = -1; this.locked = false; this.funNames = false; this.quizDone = 0; this.highlights = []; this.responses = {};
       await this.ctx.storage.put("setup", this.setup);
       return new Response("ok");
     }
 
     if (url.pathname === "/status") {
       if (!this.setup) return json({ exists: false });
-      return json({ exists: true, phase: this.phase, locked: this.locked, players: this.players.size });
+      return json({ exists: true, phase: this.phase, locked: this.locked, funNames: this.funNames, players: this.players.size });
     }
 
     if (!this.setup) return new Response("No such game", { status: 404 });
@@ -198,7 +208,7 @@ export class GameRoom extends DurableObject {
           player = this.players.get(msg.pid);
           if (player.socket && player.socket !== ws) { try { player.socket.close(4000, "replaced"); } catch {} }
           player.socket = ws; player.connected = true;
-          this.send(ws, { t: "joined", pid: player.id, name: player.name, color: player.color });
+          this.send(ws, { t: "joined", pid: player.id, name: player.name, color: player.color, avatar: player.avatar });
           this.send(ws, this.playerSnapshot(player));
           this.broadcastLobby();
           return;
@@ -206,20 +216,26 @@ export class GameRoom extends DurableObject {
         if (this.locked) { this.send(ws, { t: "error", message: "This game is locked. Ask the host to unlock it." }); return; }
         if (this.phase === "podium" || this.phase === "finished") { this.send(ws, { t: "error", message: "This session has finished." }); return; }
         if (this.players.size >= MAX_PLAYERS) { this.send(ws, { t: "error", message: "This game is full." }); return; }
-        const n = cleanName(msg.name);
-        if (n.error) { this.send(ws, { t: "error", message: n.error }); return; }
-        let name = n.value, k = 2;
         const taken = new Set([...this.players.values()].map((p) => p.name.toLowerCase()));
-        while (taken.has(name.toLowerCase())) name = `${n.value.slice(0, NAME_MAX - 3)} ${k++}`;
+        let base;
+        if (this.funNames) base = FUN_NAMES.includes(msg.name) ? msg.name : funName(taken);
+        else {
+          const n = cleanName(msg.name);
+          if (n.error) { this.send(ws, { t: "error", message: n.error }); return; }
+          base = n.value;
+        }
+        let name = base, k = 2;
+        while (taken.has(name.toLowerCase())) name = `${base.slice(0, NAME_MAX - 3)} ${k++}`;
         const id = randomToken();
-        player = { id, name, color: COLORS[this.players.size % COLORS.length], score: 0, streak: 0, socket: ws, connected: true, answers: {} };
+        player = { id, name, color: COLORS[this.players.size % COLORS.length], avatar: validAvatar(msg.avatar), score: 0, streak: 0, best: 0, correct: 0, socket: ws, connected: true, answers: {} };
         this.players.set(id, player);
-        this.send(ws, { t: "joined", pid: id, name, color: player.color });
+        this.send(ws, { t: "joined", pid: id, name, color: player.color, avatar: player.avatar });
         this.send(ws, this.playerSnapshot(player));
         this.broadcastLobby();
         return;
       }
       if (msg.t === "answer") this.onAnswer(player, msg);
+      else if (msg.t === "avatar") { player.avatar = validAvatar(msg.avatar); this.send(ws, { t: "avatar_ok", avatar: player.avatar }); this.broadcastLobby(); }
       else if (msg.t === "respond") this.onRespond(player, msg);
     });
     const drop = () => { if (player && player.socket === ws) { player.connected = false; this.broadcastLobby(); } };
@@ -251,6 +267,9 @@ export class GameRoom extends DurableObject {
       }
       case "lock":
         this.locked = !!msg.locked; this.broadcastLobby();
+        break;
+      case "fun_names":
+        this.funNames = !!msg.on; this.broadcastLobby();
         break;
       case "hide":       // hide an open-text card or Q&A question
       case "answered": { // mark a Q&A question as answered (toggle)
@@ -312,6 +331,7 @@ export class GameRoom extends DurableObject {
     this.phase = "reveal";
     const q = this.slide;
     const counts = q.answers.map(() => 0);
+    const prevRank = new Map(this.ranked().map((p, i) => [p.id, i + 1]));
     for (const p of this.players.values()) {
       const a = p.answers[this.qIndex];
       if (a) counts[a.choice]++;
@@ -319,21 +339,38 @@ export class GameRoom extends DurableObject {
         const speed = 1 - a.elapsed / (q.time * 1000) / 2;
         p.streak += 1;
         a.points = Math.round(1000 * speed) + Math.min(500, (p.streak - 1) * 100);
-        p.score += a.points;
+        p.score += a.points; p.correct++; p.best = Math.max(p.best, p.streak);
       } else { p.streak = 0; if (a) a.points = 0; }
     }
+    this.quizDone++;
     const ranked = this.ranked();
+    // Milestones: celebrate streaks, taking the lead, entering the top 3 and big comebacks
+    const ms = new Map();
+    ranked.forEach((p, idx) => {
+      const rank = idx + 1, before = prevRank.get(p.id) || rank, list = [];
+      const a = p.answers[this.qIndex], right = !!a && a.choice === q.correct;
+      if (right && (p.streak === 3 || p.streak === 5 || p.streak === 7 || (p.streak >= 10 && p.streak % 5 === 0))) list.push(`streak${p.streak}`);
+      if (this.quizDone > 1 && p.score > 0) {
+        if (rank === 1 && before !== 1 && ranked.length > 1) list.push("lead");
+        else if (rank <= 3 && before > 3 && ranked.length > 3) list.push("top3");
+        if (before - rank >= 3) list.push("comeback");
+      }
+      ms.set(p.id, list);
+    });
+    const order = (k) => (k === "lead" ? 0 : k.startsWith("streak") ? 1 : k === "top3" ? 2 : 3);
+    this.highlights = ranked.flatMap((p) => (ms.get(p.id) || []).map((kind) => ({ name: p.name, avatar: p.avatar, kind, streak: p.streak })))
+      .sort((x, y) => order(x.kind) - order(y.kind)).slice(0, 3);
     this.toHosts({ t: "reveal", index: this.qIndex, correct: q.correct, counts, text: q.text, answers: q.answers, last: this.qIndex + 1 >= this.slides.length });
     ranked.forEach((p, idx) => {
       const a = p.answers[this.qIndex];
-      this.toPlayer(p, { t: "result", answered: !!a, correct: !!a && a.choice === q.correct, points: a ? a.points : 0, score: p.score, streak: p.streak, rank: idx + 1, players: ranked.length, correctText: q.answers[q.correct] });
+      this.toPlayer(p, { t: "result", answered: !!a, correct: !!a && a.choice === q.correct, points: a ? a.points : 0, score: p.score, streak: p.streak, rank: idx + 1, players: ranked.length, correctText: q.answers[q.correct], milestones: (ms.get(p.id) || []).sort((x, y) => order(x) - order(y)) });
     });
   }
 
   showLeaderboard() {
     this.phase = "leaderboard";
-    const top = this.ranked().slice(0, 5).map((p) => ({ name: p.name, score: p.score, streak: p.streak, color: p.color }));
-    this.toHosts({ t: "leaderboard", top, index: this.qIndex, total: this.slides.length, last: this.qIndex + 1 >= this.slides.length });
+    const top = this.ranked().slice(0, 5).map((p) => ({ name: p.name, score: p.score, streak: p.streak, color: p.color, avatar: p.avatar }));
+    this.toHosts({ t: "leaderboard", top, highlights: this.highlights, index: this.qIndex, total: this.slides.length, last: this.qIndex + 1 >= this.slides.length });
   }
 
   showEnd() {
@@ -347,8 +384,9 @@ export class GameRoom extends DurableObject {
     }
     this.phase = "podium";
     const ranked = this.ranked();
-    this.toHosts({ t: "podium", top: ranked.slice(0, 3).map((p) => ({ name: p.name, score: p.score, color: p.color })), players: ranked.length, results: ranked.map((p, i) => ({ rank: i + 1, name: p.name, score: p.score })), summary });
-    ranked.forEach((p, idx) => this.toPlayer(p, { t: "final", rank: idx + 1, score: p.score, players: ranked.length }));
+    this.toHosts({ t: "podium", top: ranked.slice(0, 3).map((p) => ({ name: p.name, score: p.score, color: p.color, avatar: p.avatar })), players: ranked.length, results: ranked.map((p, i) => ({ rank: i + 1, name: p.name, score: p.score })), summary });
+    const quizCount = this.slides.filter((x) => x.type === "quiz").length;
+    ranked.forEach((p, idx) => this.toPlayer(p, { t: "final", rank: idx + 1, score: p.score, players: ranked.length, perfect: quizCount > 1 && p.correct === quizCount, best: p.best }));
   }
 
   ranked() {
@@ -459,14 +497,14 @@ export class GameRoom extends DurableObject {
   }
 
   broadcastLobby() {
-    const list = [...this.players.values()].map((p) => ({ id: p.id, name: p.name, color: p.color, connected: p.connected }));
-    this.toHosts({ t: "lobby", players: list, locked: this.locked });
+    const list = [...this.players.values()].map((p) => ({ id: p.id, name: p.name, color: p.color, avatar: p.avatar, connected: p.connected }));
+    this.toHosts({ t: "lobby", players: list, locked: this.locked, funNames: this.funNames });
     if (this.phase === "lobby") this.toPlayers(() => ({ t: "lobby_wait", players: list.length }));
   }
 
   hostSnapshot() {
-    const players = [...this.players.values()].map((p) => ({ id: p.id, name: p.name, color: p.color, connected: p.connected }));
-    const snap = { t: "snapshot", pin: this.setup.pin, title: this.setup.quiz.title, total: this.slides.length, phase: this.phase, players, locked: this.locked };
+    const players = [...this.players.values()].map((p) => ({ id: p.id, name: p.name, color: p.color, avatar: p.avatar, connected: p.connected }));
+    const snap = { t: "snapshot", pin: this.setup.pin, title: this.setup.quiz.title, total: this.slides.length, phase: this.phase, players, locked: this.locked, funNames: this.funNames, mode: this.hasQuiz ? "play" : "kural" };
     if (this.phase === "question") {
       const q = this.slide;
       snap.question = { index: this.qIndex, text: q.text, answers: q.answers, time: q.time, remaining: Math.max(0, q.time * 1000 - (Date.now() - this.qStartedAt)), answered: [...this.players.values()].filter((p) => p.answers[this.qIndex]).length };
@@ -481,7 +519,7 @@ export class GameRoom extends DurableObject {
       return { t: "question", index: this.qIndex, total: this.slides.length, text: q.text, answers: q.answers, time: q.time, remaining: Math.max(0, q.time * 1000 - (Date.now() - this.qStartedAt)), alreadyAnswered: !!p.answers[this.qIndex] };
     }
     if (this.phase === "engage") return this.engageForPlayer(p);
-    if (this.phase === "podium") { const ranked = this.ranked(); return { t: "final", rank: ranked.indexOf(p) + 1, score: p.score, players: ranked.length }; }
+    if (this.phase === "podium") { const ranked = this.ranked(); return { t: "final", rank: ranked.indexOf(p) + 1, score: p.score, players: ranked.length, best: p.best }; }
     if (this.phase === "finished") return { t: "thanks" };
     if (this.phase === "lobby") return { t: "lobby_wait", players: this.players.size };
     return { t: "between", score: p.score, streak: p.streak };

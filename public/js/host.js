@@ -1,5 +1,6 @@
 import { SHAPES, SHAPE_NAMES, minni, esc, $, show, connect, startTimer, confetti } from "/js/common.js";
 import { DEMO_QUIZ, DEMO_MEETING, SLIDE_TYPES, TYPE_LABEL, blankSlide } from "/js/quizzes.js";
+import { avatarSvg } from "/js/avatar.js";
 
 const params = new URLSearchParams(location.search);
 let pin = (params.get("pin") || "").replace(/\D/g, "");
@@ -10,23 +11,40 @@ let stopTimer = null;
 let lastResults = [];   // quiz ranking
 let lastSummary = [];   // per-slide results
 let engage = null;      // current interaction slide { index, total, slide }
+let funNamesOn = false;
+let builderMode = "play";
 
-$("#demoTitle").textContent = DEMO_QUIZ.title;
-$("#meetTitle").textContent = DEMO_MEETING.title;
+$("#demoTitle").textContent = `${DEMO_QUIZ.title}: Sweden, Tamil culture and general knowledge.`;
+$("#meetTitle").textContent = "Word cloud, poll, team-health scale, open ideas and live Q&A.";
 $("#lobbyMinni").innerHTML = minni("ready", 90);
 $("#qMinni").innerHTML = minni("ready", 130);
 
 // ---------- setup ----------
 $("#playDemo").addEventListener("click", () => createGame(DEMO_QUIZ, $("#setupErr")));
 $("#playMeeting").addEventListener("click", () => createGame(DEMO_MEETING, $("#setupErr")));
-$("#openEditor").addEventListener("click", () => { renderEditor(); show("editor"); });
+$("#buildPlay").addEventListener("click", () => openBuilder("play"));
+$("#buildKural").addEventListener("click", () => openBuilder("kural"));
 $("#backToSetup").addEventListener("click", () => show("setup"));
 
-let draft = JSON.parse(localStorage.getItem("kalakal:draft") || "null") || { title: "", questions: [blankSlide("quiz")] };
-draft.questions.forEach((q) => { if (!q.type) q.type = "quiz"; });
-const saveDraft = () => { localStorage.setItem("kalakal:draft", JSON.stringify(draft)); $("#draftNote").textContent = "Draft saved"; };
+// One draft per mode, kept in this browser
+if (localStorage.getItem("kalakal:draft") && !localStorage.getItem("kalakal:draft:play")) localStorage.setItem("kalakal:draft:play", localStorage.getItem("kalakal:draft"));
+let draft = null;
+const saveDraft = () => { localStorage.setItem("kalakal:draft:" + builderMode, JSON.stringify(draft)); $("#draftNote").textContent = "Draft saved"; };
 
-$("#typePicker").innerHTML = SLIDE_TYPES.map((t) => `<button class="type-btn" type="button" data-type="${t.type}"><strong>${t.label}</strong><span>${t.hint}</span></button>`).join("");
+function openBuilder(mode) {
+  builderMode = mode;
+  draft = JSON.parse(localStorage.getItem("kalakal:draft:" + mode) || "null") || { title: "", questions: [blankSlide(mode === "play" ? "quiz" : "poll")] };
+  draft.questions.forEach((q) => { if (!q.type) q.type = "quiz"; });
+  $("#builderMode").textContent = mode === "play" ? "Kalakal Play · Quiz game" : "Kalakal Kural · Live polls & feedback";
+  $("#builderMode").className = "mode-chip " + (mode === "kural" ? "kural" : "");
+  $("#builderHint").textContent = mode === "play" ? "Players score points for right, fast answers." : "No scores: answers show live and anonymously.";
+  $("#quizTitle").placeholder = mode === "play" ? "Friday team quiz" : "Monday team check-in";
+  const group = (m, label) => `<div class="stack" style="gap:10px"><p class="muted" style="font-weight:700">${label}</p><div class="type-picker">${SLIDE_TYPES.filter((t) => t.mode === m).map((t) => `<button class="type-btn" type="button" data-type="${t.type}"><strong>${t.label}</strong><span>${t.hint}</span></button>`).join("")}</div></div>`;
+  $("#typePicker").innerHTML = mode === "play"
+    ? group("play", "Quiz games") + group("kural", "Mix in a poll or feedback slide (optional)")
+    : group("kural", "Live polls & feedback") + group("play", "Mix in a scored quiz question (optional)");
+  renderEditor(); show("editor");
+}
 $("#typePicker").addEventListener("click", (e) => {
   const b = e.target.closest("[data-type]"); if (!b) return;
   draft.questions.push(blankSlide(b.dataset.type)); saveDraft(); renderEditor();
@@ -115,7 +133,7 @@ $("#playCustom").addEventListener("click", () => {
     } else out.push({ type: q.type, text });
   }
   if (!out.length) return fail("Add at least one slide.");
-  createGame({ title: draft.title.trim() || "My Kalakal session", questions: out }, err);
+  createGame({ title: draft.title.trim() || (builderMode === "play" ? "My Kalakal quiz" : "My Kalakal session"), questions: out }, err);
   function fail(t) { err.textContent = t; err.hidden = false; }
 });
 
@@ -148,14 +166,14 @@ function onMessage(m) {
   switch (m.t) {
     case "snapshot":
       $("#lobbyTitle").textContent = m.title;
-      players = m.players; locked = m.locked; renderLobby();
+      players = m.players; locked = m.locked; funNamesOn = !!m.funNames; renderLobby();
       if (m.phase === "lobby") show("lobby");
       else if (m.phase === "question") question({ ...m.question, total: m.total, players: players.length });
       else if (m.phase === "engage") engageStart(m.engage);
       else if (m.phase === "podium" || m.phase === "finished") conn.send({ t: "end" });
       else message("Session in progress", "Continue to the next screen.", "ready", true);
       break;
-    case "lobby": players = m.players; locked = m.locked; renderLobby(); if (engage) setCount(); break;
+    case "lobby": players = m.players; locked = m.locked; funNamesOn = !!m.funNames; renderLobby(); if (engage) setCount(); break;
     case "question": engage = null; question(m); break;
     case "answer_count": $("#answered").textContent = `${m.answered} of ${m.players} answered`; break;
     case "reveal": reveal(m); break;
@@ -172,9 +190,11 @@ function renderLobby() {
   $("#pCount").textContent = players.length;
   $("#startBtn").disabled = players.length === 0;
   $("#lockBtn").textContent = locked ? "Unlock lobby" : "Lock lobby";
+  $("#funBtn").textContent = `Fun names only: ${funNamesOn ? "on" : "off"}`;
+  $("#funBtn").setAttribute("aria-pressed", String(funNamesOn));
   $("#kickHint").hidden = players.length === 0;
   $("#chips").innerHTML = players.length
-    ? players.map((p) => `<button class="chip ${p.connected ? "" : "off"}" type="button" data-id="${esc(p.id)}" aria-label="Remove ${esc(p.name)}"><span class="dot" style="background:${p.color}">${esc(p.name.charAt(0).toUpperCase())}</span>${esc(p.name)}</button>`).join("")
+    ? players.map((p) => `<button class="chip ${p.connected ? "" : "off"}" type="button" data-id="${esc(p.id)}" aria-label="Remove ${esc(p.name)}"><span class="avw">${avatarSvg(p.avatar, { size: 48 })}</span>${esc(p.name)}</button>`).join("")
     : '<p class="muted">Waiting for players to join…</p>';
 }
 $("#chips").addEventListener("click", (e) => {
@@ -183,6 +203,7 @@ $("#chips").addEventListener("click", (e) => {
   if (p && confirm(`Remove ${p.name} from the game?`)) conn.send({ t: "kick", id: p.id });
 });
 $("#lockBtn").addEventListener("click", () => conn.send({ t: "lock", locked: !locked }));
+$("#funBtn").addEventListener("click", () => conn.send({ t: "fun_names", on: !funNamesOn }));
 $("#startBtn").addEventListener("click", () => conn.send({ t: "start" }));
 $("#skipBtn").addEventListener("click", () => conn.send({ t: "skip" }));
 $("#toBoard").addEventListener("click", () => conn.send({ t: "next" }));
@@ -232,18 +253,37 @@ function board(m) {
   $("#bNum").textContent = `After slide ${m.index + 1} of ${m.total}`;
   $("#board").innerHTML = m.top.length ? m.top.map((p, i) => `
     <div class="lb-row rise" style="animation-delay:${i * 80}ms">
-      <span class="rank">${i + 1}</span><span class="dot" style="width:16px;height:16px;border-radius:99px;background:${p.color}"></span>
-      <span>${esc(p.name)}</span>${p.streak > 1 ? `<span class="pill" style="background:var(--coral);font-size:15px">Streak ×${p.streak}</span>` : ""}
+      <span class="rank">${i + 1}</span><span class="avw ${p.streak >= 3 ? "react-fire" : i === 0 ? "react-idle" : ""}">${avatarSvg(p.avatar, { size: 56, mood: p.streak >= 3 ? "fire" : i === 0 ? "happy" : "ready" })}</span>
+      <span>${esc(p.name)}</span>${p.streak > 1 ? `<span class="pill" style="background:var(--coral);font-size:15px">${p.streak >= 3 ? "On fire · " : "Streak "}×${p.streak}</span>` : ""}
       <span class="score">${p.score}</span></div>`).join("") : '<p class="muted">No players yet.</p>';
   $("#nextBtn").textContent = m.last ? "Show podium" : "Next";
   show("board");
+  toasts(m.highlights || []);
+}
+
+const HL_TEXT = {
+  lead: (h) => ["took the lead!", "New number one"], top3: (h) => ["jumped into the top 3!", "Climbing fast"],
+  comeback: (h) => ["is making a comeback!", "Up 3+ places"],
+};
+function toasts(list) {
+  const box = $("#toasts"); box.innerHTML = "";
+  list.forEach((h, i) => {
+    const [main, sub] = h.kind.startsWith("streak") ? [`is on fire!`, `${h.streak} right in a row`] : (HL_TEXT[h.kind] || (() => ["", ""]))(h);
+    const el = document.createElement("div");
+    el.className = "toast"; el.style.animationDelay = `${300 + i * 350}ms`;
+    el.innerHTML = `<span class="avw ${h.kind.startsWith("streak") ? "react-fire" : "react-bounce"}">${avatarSvg(h.avatar, { size: 64, mood: h.kind.startsWith("streak") ? "fire" : "happy" })}</span><span>${esc(h.name)} ${main}<small>${sub}</small></span>`;
+    box.appendChild(el);
+  });
+  clearTimeout(toasts.t); toasts.t = setTimeout(() => (box.innerHTML = ""), 7000);
 }
 
 function podium(m) {
+  $("#toasts").innerHTML = "";
   lastResults = m.results || [];
-  const order = [1, 0, 2], heights = ["260px", "190px", "140px"], colors = ["#FFB627", "#19D3C5", "#FF5D73"];
+  const order = [1, 0, 2], heights = ["220px", "160px", "120px"], colors = ["#FFB627", "#19D3C5", "#FF5D73"];
   $("#podium").innerHTML = order.filter((i) => m.top[i]).map((i) => `
     <div class="pod rise" style="animation-delay:${[600, 1200, 0][i]}ms">
+      <span class="avw react-dance ${i === 0 ? "react-glow" : ""}" style="animation-delay:${i * 150}ms">${avatarSvg(m.top[i].avatar, { size: i === 0 ? 140 : 110, mood: "happy", label: m.top[i].name })}</span>
       <p class="who">${esc(m.top[i].name)}</p><p style="font-family:var(--display);font-weight:800;font-size:22px">${m.top[i].score}</p>
       <div class="block" style="height:${heights[i]};background:${colors[i]}">${i + 1}</div>
     </div>`).join("");

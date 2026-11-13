@@ -1,4 +1,6 @@
 import { SHAPES, minni, esc, $, show, connect, ordinal, confetti } from "/js/common.js";
+import { avatarSvg, randomAvatar, describeAvatar } from "/js/avatar.js";
+import { funName, funNames } from "/js/names.js";
 
 const params = new URLSearchParams(location.search);
 let pin = (params.get("pin") || "").replace(/\D/g, "");
@@ -8,7 +10,39 @@ let currentQ = -1;
 let pendingName = "";
 
 $("#pin").value = pin ? pin.replace(/(\d{3})(\d{3})/, "$1 $2") : "";
-$("#waitMinni").innerHTML = minni("ready", 150);
+let myAvatar = Number(localStorage.getItem("kalakal:look"));
+if (!Number.isInteger(myAvatar) || !localStorage.getItem("kalakal:look")) myAvatar = randomAvatar();
+let funMode = false, spun = funName();
+
+function drawLook() {
+  $("#myAvatar").innerHTML = avatarSvg(myAvatar, { size: 104, mood: "wink", label: "Your character" });
+  $("#lookName").textContent = describeAvatar(myAvatar);
+  $("#waitMinni").innerHTML = avatarSvg(myAvatar, { size: 160, label: "Your character" });
+  document.querySelectorAll(".me-av").forEach((el) => (el.innerHTML = avatarSvg(myAvatar, { size: 30 })));
+  localStorage.setItem("kalakal:look", String(myAvatar));
+}
+function drawSuggestions() {
+  $("#sugg").innerHTML = funNames(3).map((n) => `<button type="button">${esc(n)}</button>`).join("");
+}
+drawLook(); drawSuggestions();
+$("#newLook").addEventListener("click", () => { myAvatar = randomAvatar(); drawLook(); });
+$("#surprise").addEventListener("click", () => { $("#nick").value = funName(); drawSuggestions(); });
+$("#sugg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { $("#nick").value = b.textContent; drawSuggestions(); } });
+$("#spin").addEventListener("click", () => { spun = funName(); $("#funName").textContent = spun; $("#funName").style.animation = "none"; void $("#funName").offsetWidth; $("#funName").style.animation = ""; });
+$("#waitLook").addEventListener("click", () => { myAvatar = randomAvatar(); drawLook(); conn && conn.send({ t: "avatar", avatar: myAvatar }); });
+
+// Does this game use "fun names only"?
+async function checkMode(code) {
+  try {
+    const r = await fetch("/api/games/" + code).then((r) => r.json());
+    funMode = !!(r.exists && r.funNames);
+    $("#nameField").hidden = funMode; $("#funField").hidden = !funMode;
+    $("#nick").required = !funMode;
+    if (funMode) $("#funName").textContent = spun;
+  } catch {}
+}
+if (pin) checkMode(pin);
+$("#pin").addEventListener("input", () => { const c = $("#pin").value.replace(/\D/g, ""); if (c.length === 6) checkMode(c); });
 if (pin) $("#nick").focus(); else $("#pin").focus();
 
 // Resume a game after a refresh
@@ -22,9 +56,9 @@ if (saved && saved.pid) {
 $("#joinForm").addEventListener("submit", (e) => {
   e.preventDefault();
   pin = $("#pin").value.replace(/\D/g, "");
-  pendingName = $("#nick").value.trim();
+  pendingName = funMode ? spun : $("#nick").value.trim();
   if (pin.length !== 6) return joinError("A game PIN has 6 digits.");
-  if (pendingName.length < 2) return joinError("Pick a nickname with at least 2 characters.");
+  if (pendingName.length < 2) return joinError("Pick a nickname with at least 2 characters, or tap Surprise me.");
   $("#joinBtn").disabled = true;
   history.replaceState(null, "", "/play.html?pin=" + pin);
   start();
@@ -38,7 +72,7 @@ function joinError(text) {
 function start() {
   if (conn) conn.close();
   conn = connect(pin, "player", {
-    onOpen: () => conn.send({ t: "join", pid: me && me.pid, name: pendingName || (me && me.name) }),
+    onOpen: () => conn.send({ t: "join", pid: me && me.pid, name: pendingName || (me && me.name), avatar: myAvatar }),
     onStatus: (s) => { $("#status").hidden = s === "online"; },
     onMessage,
   });
@@ -46,14 +80,16 @@ function start() {
 
 function setMe(m) {
   me = { pid: m.pid, name: m.name, color: m.color };
+  if (Number.isInteger(m.avatar)) myAvatar = m.avatar;
   localStorage.setItem("kalakal:" + pin, JSON.stringify(me));
   document.querySelectorAll(".me").forEach((el) => (el.textContent = me.name));
-  document.querySelectorAll(".p-name .dot").forEach((el) => (el.style.background = me.color));
+  drawLook();
 }
 
 function onMessage(m) {
   switch (m.t) {
     case "joined": setMe(m); break;
+    case "avatar_ok": myAvatar = m.avatar; drawLook(); break;
     case "error":
       if (!me || !me.pid) { conn.close(); conn = null; joinError(m.message); }
       else message("Hmm.", m.message, "sad");
@@ -113,31 +149,46 @@ function locked(choice) {
   show("locked");
 }
 
+const MILESTONE_TEXT = {
+  lead: "You took the lead!", top3: "You're in the top 3!", comeback: "What a comeback!",
+  streak3: "On fire! 3 in a row", streak5: "Unstoppable! 5 in a row", streak7: "Legendary! 7 in a row",
+};
+function milestoneText(k) { return MILESTONE_TEXT[k] || (k.startsWith("streak") ? `Streak ×${k.slice(6)}!` : ""); }
+
 function result(m) {
   const el = $("#result");
   const cls = !m.answered ? "none" : m.correct ? "good" : "bad";
   el.className = "result " + cls;
-  const streak = m.correct && m.streak > 1 ? `<p style="font-weight:800;font-size:20px">Streak ×${m.streak}</p>` : "";
+  const ms = m.milestones || [];
+  const top = ms[0];
+  const react = !m.correct ? (m.answered ? "wobble" : "idle") : top === "lead" ? "spin" : top && top.startsWith("streak") ? "fire" : top ? "dance" : "bounce";
+  const mood = !m.correct ? (m.answered ? "sad" : "hurry") : top && top.startsWith("streak") ? "fire" : "happy";
+  const streak = m.correct && m.streak > 1 && !(top && top.startsWith("streak")) ? `<p style="font-weight:800;font-size:20px">Streak ×${m.streak}</p>` : "";
   el.innerHTML = `
-    <div>${minni(m.correct ? "happy" : m.answered ? "sad" : "hurry", 140)}</div>
+    <div class="avw react-${react}">${avatarSvg(myAvatar, { size: 160, mood, label: "Your character" })}</div>
     <p class="big">${m.correct ? "Kalakal!" : m.answered ? "Not this time" : "Time's up"}</p>
     ${m.correct ? `<p class="big" style="font-size:34px">+${m.points}</p>` : `<p style="font-weight:700;font-size:19px">Answer: ${esc(m.correctText)}</p>`}
+    ${ms.map((k) => `<p class="milestone">${esc(milestoneText(k))}</p>`).join("")}
     ${streak}
     <p style="font-weight:800;font-size:20px">You're ${ordinal(m.rank)} of ${m.players} · ${m.score} pts</p>`;
-  navigator.vibrate && navigator.vibrate(m.correct ? [30, 40, 30] : 120);
+  navigator.vibrate && navigator.vibrate(ms.length ? [40, 50, 40, 50, 80] : m.correct ? [30, 40, 30] : 120);
+  if (ms.includes("lead") || ms.some((k) => k.startsWith("streak5") || k.startsWith("streak7"))) confetti(60);
   show("result");
 }
 
 function final(m) {
   const podium = m.rank <= 3;
+  const title = m.rank === 1 ? "Champion!" : `${ordinal(m.rank)} place`;
   $("#final").innerHTML = `
-    <div class="float">${minni(podium ? "happy" : "ready", 160)}</div>
+    <div class="avw ${podium ? "react-dance react-glow" : "react-bounce"}">${avatarSvg(myAvatar, { size: 170, mood: podium ? "happy" : "wink", label: "Your character" })}</div>
     <p class="eyebrow">Final result</p>
-    <h1 style="font-size: 40px">${ordinal(m.rank)} place</h1>
+    <h1 style="font-size: 40px">${title}</h1>
     <p style="font-family: var(--display); font-weight: 800; font-size: 28px; color: var(--marigold)">${m.score} points</p>
+    ${m.perfect ? '<p class="milestone">Perfect game! Every answer right</p>' : ""}
+    ${m.best >= 3 ? `<p class="muted">Best streak: ${m.best} in a row</p>` : ""}
     <p class="muted">${podium ? "You made the podium. Kalakal!" : `Out of ${m.players} players. Great game!`}</p>
     <a class="btn btn-ghost" href="/host.html">Host your own game, free</a>`;
-  if (podium) confetti(90);
+  if (podium || m.perfect) confetti(110);
   localStorage.removeItem("kalakal:" + pin);
   show("final");
 }

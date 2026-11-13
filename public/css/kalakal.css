@@ -125,3 +125,31 @@ button.chip:hover { background: #33204F; }
   .answer { font-size: 19px; min-height: 64px; }
   .card { padding: 22px; }
 }
+
+/* ---------- Avatars and reactions ---------- */
+.avw { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.avw .av { position: relative; z-index: 1; overflow: visible; }
+.react-idle .av { animation: float 3s ease-in-out infinite; }
+.react-bounce .av { animation: hop .9s cubic-bezier(.3,1.6,.5,1) 3; }
+.react-wobble .av { animation: wobble .9s ease-in-out 2; }
+.react-spin .av { animation: spinpop 1.1s cubic-bezier(.2,1.2,.4,1) 1, hop .9s .9s cubic-bezier(.3,1.6,.5,1) 2; }
+.react-dance .av { animation: dance 1s ease-in-out infinite; }
+.react-fire .av { animation: hop .7s cubic-bezier(.3,1.6,.5,1) infinite; }
+.react-fire, .react-glow { position: relative; isolation: isolate; }
+.react-fire::before, .react-glow::before {
+  content: ""; position: absolute; inset: 4%; border-radius: 50%; z-index: 0;
+  background: radial-gradient(circle at 50% 55%, rgba(255,224,138,.95), rgba(255,182,39,.8) 35%, rgba(255,93,115,.55) 55%, rgba(255,93,115,0) 72%);
+  filter: blur(8px); mix-blend-mode: screen; animation: flicker .35s ease-in-out infinite alternate;
+}
+.react-glow::before { background: radial-gradient(circle, rgba(255,224,138,.9), rgba(255,182,39,.4) 50%, rgba(255,182,39,0) 70%); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes hop { 0%,100% { transform: translateY(0) scale(1); } 30% { transform: translateY(-18%) scale(1.05, .95); } 55% { transform: translateY(0) scale(.95, 1.05); } }
+@keyframes wobble { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-9deg); } 75% { transform: rotate(9deg); } }
+@keyframes spinpop { from { transform: rotate(-360deg) scale(.3); } to { transform: rotate(0) scale(1); } }
+@keyframes dance { 0%,100% { transform: rotate(-8deg) translateY(0); } 25% { transform: rotate(0) translateY(-10%); } 50% { transform: rotate(8deg) translateY(0); } 75% { transform: rotate(0) translateY(-10%); } }
+@keyframes flicker { from { transform: scale(.92) translateY(2%); opacity: .75; } to { transform: scale(1.08) translateY(-3%); opacity: 1; } }
+@keyframes pulse { 0%,100% { transform: scale(.9); opacity: .6; } 50% { transform: scale(1.1); opacity: 1; } }
+.badge-burst { display: inline-flex; align-items: center; gap: 8px; background: var(--ink); color: var(--marigold); border-radius: 99px; padding: 6px 16px; font-family: var(--display); font-weight: 800; font-size: 18px; animation: pop .5s cubic-bezier(.2,1.4,.4,1) both; }
+.toasts { position: fixed; right: 24px; top: 24px; display: flex; flex-direction: column; gap: 12px; z-index: 40; max-width: 420px; }
+.toast { display: flex; align-items: center; gap: 14px; background: var(--night); border: 2px solid var(--marigold); border-radius: 20px; padding: 10px 18px 10px 10px; font-weight: 800; font-size: 19px; animation: slidein .5s cubic-bezier(.2,1.2,.4,1) both; box-shadow: 0 12px 30px rgba(0,0,0,.35); }
+.toast small { display: block; font-weight: 600; color: var(--soft); font-size: 15px; }
+@keyframes slidein { from { transform: translateX(120%); opacity: 0; } to { transform: none; opacity: 1; } }

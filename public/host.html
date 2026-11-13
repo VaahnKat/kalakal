@@ -25,7 +25,7 @@
   select { min-height: 44px; width: auto; font-size: 16px; }
   .icon-btn { background: transparent; border: 0; color: var(--mist); font-weight: 700; cursor: pointer; font-family: var(--body); font-size: 15px; min-height: 44px; padding: 0 10px; }
   .icon-btn:hover { color: var(--coral); }
-  .type-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 10px; }
+  .type-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 10px; }
   .type-btn { text-align: left; background: var(--ink); border: 2px solid var(--line); border-radius: 14px; padding: 12px 16px; color: var(--cream); cursor: pointer; font-family: var(--body); min-height: 64px; }
   .type-btn:hover { border-color: var(--teal); }
   .type-btn strong { display: block; font-size: 17px; }
@@ -46,10 +46,28 @@
   .qa-row.done { opacity: .5; }
   .votes { min-width: 64px; text-align: center; font-family: var(--display); font-weight: 800; font-size: 22px; color: var(--marigold); }
   details summary { cursor: pointer; color: var(--mist); font-weight: 700; padding: 6px 0; }
+  .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 22px; }
+  .mode { background: var(--night); border-radius: 28px; padding: 30px; display: flex; flex-direction: column; gap: 16px; border-top: 8px solid var(--marigold); }
+  .mode-kural { border-top-color: var(--teal); }
+  .mode-head { display: flex; align-items: center; gap: 16px; }
+  .mode-head h2 { font-size: 28px; }
+  .mode-icon { width: 60px; height: 60px; border-radius: 18px; background: var(--marigold); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .mode-kural .mode-icon { background: var(--teal); }
+  .mode-lead { font-size: 20px; font-weight: 700; }
+  .mode-list { margin: 0; padding-left: 22px; color: var(--soft); display: flex; flex-direction: column; gap: 4px; }
+  .mode-best { font-weight: 700; color: var(--mist); font-size: 16px; }
+  .mode-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: auto; }
+  .btn-teal { background: var(--teal); color: var(--ink); }
+  .btn-teal:hover { filter: brightness(1.06); color: var(--ink); }
+  .mode-chip { border-radius: 99px; padding: 4px 14px; font-weight: 800; color: var(--ink); background: var(--marigold); }
+  .mode-chip.kural { background: var(--teal); }
+  .chip .avw { width: 48px; height: 48px; margin: -8px 0 -8px -6px; }
+  .lb-row .avw { width: 56px; height: 56px; }
+  .pod .avw { margin-bottom: -8px; }
   /* lobby */
   .lobby { display: flex; gap: 36px; flex-wrap: wrap; padding: 12px 0 40px; flex: 1; }
   .join-panel { flex: 0 1 440px; display: flex; flex-direction: column; justify-content: space-between; gap: 28px; }
-  .big-pin { font-family: var(--display); font-weight: 800; font-size: clamp(56px, 7vw, 92px); line-height: 1; letter-spacing: 2px; color: var(--marigold); }
+  .big-pin { font-family: var(--display); font-weight: 800; font-size: clamp(44px, 4.6vw, 68px); line-height: 1; letter-spacing: 1px; color: var(--marigold); white-space: nowrap; }
   .qr { width: 170px; height: 170px; background: var(--cream); border-radius: 16px; padding: 10px; flex-shrink: 0; }
   .qr svg { width: 100%; height: 100%; display: block; }
   .players { flex: 1 1 480px; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
@@ -71,34 +89,48 @@
 </style>
 </head>
 <body>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 
-<!-- 1. Choose a quiz -->
+<!-- 1. Choose a mode -->
 <section class="screen" data-screen="setup">
   <div class="wrap">
-    <nav class="h-nav"><a class="brand" href="/"><img src="/img/icon.svg" alt="">kalakal</a></nav>
-    <div class="stack" style="padding-bottom: 60px">
-      <h1 style="font-size: clamp(32px, 4vw, 48px)">Host a game</h1>
-      <p class="muted">Pick a ready-made session or build your own with quiz questions, polls, word clouds, scales and Q&amp;A. Players join on their phones with a PIN.</p>
-      <div class="choices">
-        <div class="card stack">
-          <p class="eyebrow">Ready to play</p>
-          <h2 style="font-size: 24px" id="demoTitle"></h2>
-          <p class="muted">10 questions mixing Sweden, Tamil culture and general knowledge. Great for testing with friends.</p>
-          <button class="btn btn-primary" type="button" id="playDemo">Play this quiz</button>
-        </div>
-        <div class="card stack">
-          <p class="eyebrow">Ready to engage</p>
-          <h2 style="font-size: 24px" id="meetTitle"></h2>
-          <p class="muted">Word cloud, poll, team-health scale, a quiz question, open ideas and live Q&amp;A. Made for meetings and workshops.</p>
-          <button class="btn btn-primary" type="button" id="playMeeting">Run this session</button>
-        </div>
-        <div class="card stack">
-          <p class="eyebrow">Your own</p>
-          <h2 style="font-size: 24px">Build your own</h2>
-          <p class="muted">Mix up to 50 slides: quiz questions, polls, word clouds, open questions, scales and Q&amp;A. Your draft is saved in this browser.</p>
-          <button class="btn btn-ghost" type="button" id="openEditor">Open the builder</button>
-        </div>
+    <nav class="h-nav"><a class="brand" href="/"><img src="/img/icon.svg" alt="">kalakal</a><a class="muted" href="/avatars.html" style="font-weight: 700">Meet the crew</a></nav>
+    <div class="stack" style="padding-bottom: 60px; gap: 28px">
+      <div class="stack" style="gap: 8px">
+        <h1 style="font-size: clamp(32px, 4vw, 48px)">What do you want to run?</h1>
+        <p class="muted">Two ways to light up a room. Players join both the same way: a PIN on their phone.</p>
       </div>
+      <div class="modes">
+        <article class="mode mode-play">
+          <div class="mode-head">
+            <div class="mode-icon"><svg aria-hidden="true" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#160B2A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 L4 14 h7 l-1 8 9-12 h-7 z"/></svg></div>
+            <div><p class="eyebrow" style="color: var(--marigold)">Kalakal Play</p><h2>Quiz games</h2></div>
+          </div>
+          <p class="mode-lead">Compete for points. Everyone races the clock from their phone.</p>
+          <ul class="mode-list"><li>Right answers, timer and speed points</li><li>Streaks, characters and live reactions</li><li>Scoreboard and a podium at the end</li></ul>
+          <p class="mode-best">Best for: classes, parties, team socials, events</p>
+          <div class="mode-actions">
+            <button class="btn btn-primary" type="button" id="playDemo">Play the warm-up quiz</button>
+            <button class="btn btn-ghost" type="button" id="buildPlay">Build a quiz</button>
+          </div>
+          <p class="muted" style="font-size: 15px" id="demoTitle"></p>
+        </article>
+        <article class="mode mode-kural">
+          <div class="mode-head">
+            <div class="mode-icon"><svg aria-hidden="true" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#160B2A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5 h16 v11 h-9 l-5 4 v-4 h-2 z"/><path d="M8 10 h8"/></svg></div>
+            <div><p class="eyebrow" style="color: var(--teal)">Kalakal Kural</p><h2>Live polls &amp; feedback</h2></div>
+          </div>
+          <p class="mode-lead">Hear everyone. Answers appear live on the big screen, anonymously.</p>
+          <ul class="mode-list"><li>Polls, word clouds and open questions</li><li>Scales from 1 to 5 and live Q&amp;A with upvotes</li><li>No scores, no pressure, honest input</li></ul>
+          <p class="mode-best">Best for: meetings, workshops, talks, retros</p>
+          <div class="mode-actions">
+            <button class="btn btn-teal" type="button" id="playMeeting">Run the meeting warm-up</button>
+            <button class="btn btn-ghost" type="button" id="buildKural">Build a session</button>
+          </div>
+          <p class="muted" style="font-size: 15px" id="meetTitle"></p>
+        </article>
+      </div>
+      <p class="muted" style="text-align: center">Want both? In the builder you can mix quiz questions and polls in one session.</p>
       <p class="error" id="setupErr" role="alert" hidden></p>
     </div>
   </div>
@@ -108,10 +140,11 @@
 <section class="screen" data-screen="editor" hidden>
   <div class="wrap">
     <nav class="h-nav"><a class="brand" href="/"><img src="/img/icon.svg" alt="">kalakal</a><button class="btn btn-ghost btn-sm" type="button" id="backToSetup">Back</button></nav>
+    <div class="row" style="padding-bottom: 18px"><span class="mode-chip" id="builderMode"></span><span class="muted" id="builderHint"></span></div>
     <div class="stack" style="padding-bottom: 120px">
       <div class="field"><label for="quizTitle">Session title</label><input id="quizTitle" type="text" maxlength="80" placeholder="Friday team session"></div>
       <div class="stack" id="qList"></div>
-      <div class="card stack"><p class="eyebrow">Add a slide</p><div class="type-picker" id="typePicker"></div></div>
+      <div class="card stack"><p class="eyebrow">Add a slide</p><div class="stack" id="typePicker" style="gap: 18px"></div></div>
       <p class="error" id="editErr" role="alert" hidden></p>
       <div class="row"><button class="btn btn-primary" type="button" id="playCustom">Create game</button><span class="muted" id="draftNote"></span></div>
     </div>
@@ -136,7 +169,7 @@
         <p class="muted" id="kickHint" hidden>Tap a name to remove a player.</p>
         <div class="chips" id="chips"><p class="muted" id="emptyHint">Waiting for players to join…</p></div>
         <div class="footer-bar">
-          <button class="btn btn-ghost btn-sm" type="button" id="lockBtn">Lock lobby</button>
+          <div class="row"><button class="btn btn-ghost btn-sm" type="button" id="lockBtn">Lock lobby</button><button class="btn btn-ghost btn-sm" type="button" id="funBtn" aria-pressed="false">Fun names only: off</button></div>
           <button class="btn btn-primary" type="button" id="startBtn" disabled>Start game</button>
         </div>
       </div>

@@ -1,8 +1,14 @@
 # Kalakal — live quizzes anyone can join with a PIN
 
-Version 0.2. Host quizzes **and** live audience interaction on a big screen; players join on their phones with a 6-digit PIN or QR code. No app, no account.
+Version 0.3. Host quizzes **and** live audience interaction on a big screen; players join on their phones with a 6-digit PIN or QR code. No app, no account.
 
 ## What works today
+**New in 0.3: characters, fun names and celebrations**
+- Two clear modes on the host start screen: **Kalakal Play** (quiz games) and **Kalakal Kural** (live polls & feedback); the builder opens in the chosen mode and can still mix both
+- Every player gets a character: Minni (spark) or Bubbi (voice bubble, echoes the logo) in 4 colours, 14 outfits (crown, superhero, wizard, DJ, cricketer, viking, chef, graduate, malli poo, ninja, winter, astronaut…) and eyewear: 2,800 looks. "New look" button on join and in the lobby. Gallery at `/avatars.html`
+- Fun names: "Surprise me" button and name ideas on the join screen (1,150 combos like Captain Dosa, Turbo Penguin); host can switch on **Fun names only** so nobody types a name
+- Milestones with animated reactions: on fire (3/5/7/10 in a row), took the lead, entered the top 3, comeback, perfect game. Phones show the player's own character reacting; the scoreboard shows highlight pop-ups and fire effects; the podium shows the winners' characters dancing
+
 **Kalakal Kural (new in 0.2): audience interaction, mixable with quiz questions in one session**
 - **Poll:** live bar chart with percentages; players can change their vote
 - **Word cloud:** up to 3 words each; same words (any case) merge and grow
@@ -53,7 +59,8 @@ node test/load-test.mjs http://localhost:8787 25
 | API + live game rooms | `src/index.js` — one Cloudflare Worker; each PIN is a Durable Object holding the game in memory |
 | Brand | `public/css/kalakal.css`, logos in `public/img/`, fonts self-hosted in `public/fonts/` (SIL OFL) |
 | QR codes | `public/vendor/qrcode.js` (MIT, Kazuhiko Arase) |
-| Tests | `test/load-test.mjs` (quiz bots), `test/engage-test.mjs` (interaction bots), `test/screens*.py` (screenshots with Playwright) |
+| Characters and names | `public/js/avatar.js` (SVG character builder), `public/js/names.js` — shared by browser and server |
+| Tests | `test/load-test.mjs` (quiz bots), `test/engage-test.mjs` (interaction bots), `test/fun-test.mjs` (characters, names, milestones), `test/screens*.py` (screenshots with Playwright) |
 
 Runs on Cloudflare's free Workers plan (SQLite-backed Durable Objects). Limits per game: 200 players, 50 questions.
 

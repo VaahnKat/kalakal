@@ -2,12 +2,12 @@
 // Slide types: quiz, poll, wordcloud, open, scale, qa
 
 export const SLIDE_TYPES = [
-  { type: "quiz", label: "Quiz question", hint: "One right answer, timer and points" },
-  { type: "poll", label: "Poll", hint: "Live bar chart, no right answer" },
-  { type: "wordcloud", label: "Word cloud", hint: "Short words grow as more people send them" },
-  { type: "open", label: "Open question", hint: "Free-text answers shown as cards" },
-  { type: "scale", label: "Scale", hint: "Rate statements from 1 to 5" },
-  { type: "qa", label: "Q&A", hint: "Audience asks and upvotes questions" },
+  { type: "quiz", mode: "play", label: "Quiz question", hint: "One right answer, timer and points" },
+  { type: "poll", mode: "kural", label: "Poll", hint: "Live bar chart, no right answer" },
+  { type: "wordcloud", mode: "kural", label: "Word cloud", hint: "Short words grow as more people send them" },
+  { type: "open", mode: "kural", label: "Open question", hint: "Free-text answers shown as cards" },
+  { type: "scale", mode: "kural", label: "Scale", hint: "Rate statements from 1 to 5" },
+  { type: "qa", mode: "kural", label: "Q&A", hint: "Audience asks and upvotes questions" },
 ];
 export const TYPE_LABEL = Object.fromEntries(SLIDE_TYPES.map((t) => [t.type, t.label]));
 
@@ -33,7 +33,6 @@ export const DEMO_MEETING = {
     { type: "wordcloud", text: "One word for how your week is going" },
     { type: "poll", text: "How do you prefer to start the day?", answers: ["Coffee", "Tea", "Fika with cake", "Straight to work"] },
     { type: "scale", text: "How are we doing as a team?", statements: ["We communicate clearly", "Meetings are useful", "I can ask for help easily"], low: "Disagree", high: "Agree" },
-    { type: "quiz", text: 'What is "fika" in Sweden?', answers: ["A coffee break with something sweet", "A winter festival", "A folk dance", "A type of boat"], correct: 0, time: 20 },
     { type: "open", text: "What is one thing we should start doing?" },
     { type: "qa", text: "Ask the team anything" },
   ],

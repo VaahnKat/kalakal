@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kalakal characters</title>
+<link rel="icon" href="/img/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/css/kalakal.css">
+<style>
+  .gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 14px; }
+  .gal figure { margin: 0; background: var(--night); border-radius: 18px; padding: 10px 6px 12px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .gal figcaption { font-size: 14px; font-weight: 700; color: var(--soft); text-align: center; }
+  section.block { display: flex; flex-direction: column; gap: 14px; padding: 18px 0 30px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav style="padding: 22px 0"><a class="brand" href="/"><img src="/img/icon.svg" alt="">kalakal</a></nav>
+  <h1 style="font-size: 40px">Meet the Kalakal crew</h1>
+  <p class="muted" style="margin-top: 8px">Every player gets their own character: 2 shapes × 4 colours × 5 spark colours × 14 outfits × eyewear = over 2,000 looks.</p>
+  <section class="block"><h2 style="font-size: 24px">Minni · the spark</h2><div class="gal" id="minni"></div></section>
+  <section class="block"><h2 style="font-size: 24px">Bubbi · the voice bubble (echoes the Kalakal logo)</h2><div class="gal" id="bubbi"></div></section>
+  <section class="block"><h2 style="font-size: 24px">Moods and reactions</h2><div class="gal" id="moods"></div></section>
+  <section class="block"><h2 style="font-size: 24px">Random players</h2><div class="gal" id="random"></div></section>
+</div>
+<script type="module">
+  import { avatarSvg, encodeAvatar, OUTFITS, OUTFIT_NAMES, randomAvatar, describeAvatar } from "/js/avatar.js";
+  const colors = ["#FFB627", "#19D3C5", "#FF5D73", "#A78BFA"], rays = ["#FF5D73", "#A78BFA", "#FFB627", "#19D3C5"];
+  const eyesFor = { dj: "shades", grad: "round", astro: "none", wizard: "stars" };
+  const fig = (seed, cap, mood) => `<figure>${avatarSvg(seed, { size: 104, mood, label: cap })}<figcaption>${cap}</figcaption></figure>`;
+  for (const [id, body] of [["minni", "spark"], ["bubbi", "bubble"]]) {
+    document.getElementById(id).innerHTML = OUTFITS.map((o, i) => fig(encodeAvatar({ body, color: colors[i % 4], ray: rays[(i + 1) % 4], outfit: o, eyes: eyesFor[o] || "none" }), OUTFIT_NAMES[o])).join("");
+  }
+  const base = encodeAvatar({ body: "spark", color: "#FFB627", ray: "#FF5D73", outfit: "crown" });
+  document.getElementById("moods").innerHTML = [["ready", "Ready"], ["wink", "Wink"], ["happy", "Correct!"], ["fire", "On fire"], ["hurry", "Hurry"], ["sad", "Not this time"]]
+    .map(([m, c]) => `<figure><div class="avw react-${m === "fire" ? "fire" : m === "happy" ? "bounce" : m === "sad" ? "wobble" : "idle"}">${avatarSvg(base, { size: 104, mood: m, label: c })}</div><figcaption>${c}</figcaption></figure>`).join("");
+  document.getElementById("random").innerHTML = Array.from({ length: 18 }, () => { const s = randomAvatar(); return fig(s, describeAvatar(s)); }).join("");
+</script>
+</body>
+</html>

@@ -1,9 +1,9 @@
 # Kalakal Handbook
 
 The one document that explains what Kalakal is, how it is built, and how to change it.
-Version 0.5 · November 2026 · Owner: Prabha
+Version 0.6 · November 2026 · Owner: Prabha
 
-**Live site:** https://kalakal.prabhuwinz17.workers.dev
+**Live site:** https://kalakal.se (once connected, see section 7) · https://kalakal.prabhuwinz17.workers.dev
 **Code:** https://github.com/VaahnKat/kalakal (branch `main` deploys automatically)
 **Files and originals:** Google Drive → `Kalakal`
 
@@ -31,10 +31,10 @@ A free, browser-based live quiz and audience-engagement app. The host shows a bi
 | Mode | What it is like | Slide types |
 |---|---|---|
 | **Kalakal Play** | Kahoot-style quiz game: timer, points, streaks, podium | Quiz question |
-| **Kalakal Kural** | Mentimeter-style live feedback: anonymous, no scores | Poll, Word cloud, Open question, Scale, Q&A |
+| **Kalakal Pulse** | Mentimeter-style live feedback: anonymous, no scores | Poll, Word cloud, Open question, Scale, Q&A |
 | **Vizha** (planned) | Big events and festivals, teams and houses | — |
 
-The name: *kalakal* is Tamil slang for "awesome". *Kural* means "voice". *Vizha* means "festival".
+The name: *kalakal* is Tamil slang for "awesome". *Vizha* means "festival". The feedback mode was first called *Kural* ("voice" in Tamil) and renamed **Pulse** in v0.6 so everyone understands it at once; in the code its id is still `kural`.
 
 **Business model (planned):** free core forever; a paid tier later for saved quiz libraries, larger audiences, branding and reports. Running cost today: zero (Cloudflare free plan).
 
@@ -51,7 +51,9 @@ kalakal/
 ├── docs/
 │   └── HANDBOOK.md           This document
 ├── src/
-│   └── index.js              The server: API + live game rooms (Cloudflare Worker + Durable Object)
+│   ├── index.js              The server: API + live game rooms (Cloudflare Worker + Durable Object)
+│   ├── ai.js                 AI quiz generator: prompts, model calls, daily allowance (AiQuota)
+│   └── text.js               Shared text cleaning and the blocked-words filter
 ├── public/                   Everything the browser downloads (no build step)
 │   ├── index.html            Home page with "Join a game"
 │   ├── host.html             Host: choose mode, build, lobby, big-screen game
@@ -67,11 +69,12 @@ kalakal/
 │   │   ├── names.js          Fun-name generator, shared with the server
 │   │   ├── quizzes.js        Slide types and the two ready-made sessions
 │   │   ├── quicktype.js      Quick-type text + spreadsheet import/export, AI prompt
+│   │   ├── ai-ui.js          "Create with AI" window: settings, PDF reading, review
 │   │   └── media.js          Picture compression, YouTube embeds
 │   ├── img/                  Logo, icon, mascots, guide/ (step GIFs)
 │   ├── templates/            Downloadable spreadsheet template (CSV)
 │   ├── fonts/                Self-hosted Unbounded + Catamaran (Tamil support)
-│   └── vendor/qrcode.js      QR code library (MIT)
+│   └── vendor/               qrcode.js (MIT), pdfjs/ (Mozilla pdf.js, Apache-2.0, loaded only for PDFs)
 ├── design/                   Original artwork (not served to users)
 │   ├── logo/                 Logo and icon SVG masters
 │   └── mascots/source/       Full-size mascot PNGs + expression sheet
@@ -120,7 +123,7 @@ Host browser ── POST /api/games ──> Worker (src/index.js) ──> new ro
 
 1. The host picks a session and the browser sends it to `POST /api/games`. The server checks it, creates a room with a random 6-digit PIN and returns a secret **host key** (kept in the host's browser, so only that browser can control the game).
 2. Host and players connect to the room over a WebSocket. All game rules run on the server: the correct answer never reaches phones before the reveal.
-3. The room moves through phases: `lobby → question → reveal → leaderboard → … → podium → finished`. Kural slides use the `engage` phase.
+3. The room moves through phases: `lobby → question → reveal → leaderboard → … → podium → finished`. Pulse slides use the `engage` phase.
 4. If a phone refreshes or loses Wi-Fi it rejoins with the same player id and keeps its score. The host can refresh too.
 
 **Why this stack:** Cloudflare Workers + Durable Objects give real-time rooms for free, with no server to maintain. Plain HTML/CSS/JS means no build step: what is in `public/` is what users get.
@@ -168,6 +171,22 @@ Each recipe says which file to open and what to change. After any change: test l
 
 How pictures work today: uploads are shrunk in the browser and saved with the draft (browser storage, ~5 MB in total). During a game they stay in the host's tab and show on the big screen only; phones get just the answers. Server storage (Cloudflare R2) comes with accounts.
 
+### AI quiz generator (`src/ai.js`)
+
+| I want to… | Change |
+|---|---|
+| Use a different AI model | `MODELS` (first is used, second is the fallback). Model list and prices: Cloudflare docs → Workers AI → Models |
+| Change how many free AI quizzes people get | `LIMITS.quizzesPerPerson`, `LIMITS.tweaksPerPerson` |
+| Change the site-wide daily budget | `LIMITS.siteUnits` (1 unit = 1 quiz ≈ 90 Neurons; keep the total under the free 10,000 Neurons a day) |
+| Change what the AI is told | `systemPrompt`, `quizPrompt`, `tweakPrompt` |
+| Add a language to the menu | `public/host.html`, the `aiLang` select (any language also works via "Other…") |
+| Change options (counts, audiences, levels) | `COUNTS`, `AUDIENCES`, `LEVELS` in `src/ai.js` and the matching selects in `public/host.html` |
+| See AI usage and cost | Cloudflare dashboard → AI → Workers AI (Neurons used per day) and Workers & Pages → kalakal → Logs |
+
+How it works: the browser sends the topic/notes and options to `POST /api/ai/quiz`. The Worker checks the daily allowance (`AiQuota` Durable Object, keyed by a daily-salted hash of the IP address, so no personal data is stored), asks the model for questions in the quick-type format, cleans and parses them with the same parser as pasted text, shuffles the answers, and returns slides. Nothing is added to the quiz until the host reviews it. If the model fails, the allowance is refunded. When the allowance runs out, people are offered **Copy AI prompt** instead.
+
+Local development uses fake AI replies (`npm run dev`, `AI_MOCK=1`), so it works without a Cloudflare login. `npm run dev:ai` uses the real model (needs `npx wrangler login`).
+
 ### Rules and limits (all in `src/index.js`, top of file)
 
 | Setting | Constant | Today |
@@ -193,7 +212,7 @@ How pictures work today: uploads are shrunk in the browser and saved with the dr
 | I want to… | Do this |
 |---|---|
 | Replace a mascot or add a new expression | Put the PNG in `design/mascots/source/`, add it to `SINGLES` or `SHEET_CELLS` in `tools/build_mascots.py`, run `npm run mascots`, check `/avatars.html` |
-| Change which expression shows when | `public/js/host.js`: search `M("host-` (question = thinking, last 5 s = surprised, reveal = happy, Kural waiting = explorer-thinking) |
+| Change which expression shows when | `public/js/host.js`: search `M("host-` (question = thinking, last 5 s = surprised, reveal = happy, Pulse waiting = explorer-thinking) |
 | Add a player outfit | `public/js/avatar.js`: add to `OUTFITS` + `OUTFIT_NAMES` and draw it in the outfit function. **Add at the end of the list**, otherwise saved player looks change |
 
 ### Bigger changes
@@ -217,7 +236,7 @@ How pictures work today: uploads are shrunk in the browser and saved with the dr
 | Marigold | `#FFB627` | Primary buttons, answer 1, mascot body |
 | Coral | `#FF5D73` | Answer 3, alerts |
 | Teal | `#19D3C5` | Answer 2, success |
-| Lilac | `#A78BFA` | Answer 4, Kural accents |
+| Lilac | `#A78BFA` | Answer 4, Pulse accents |
 
 Rule: text on Marigold, Coral, Teal or Lilac is always Ink (contrast). Answers always pair a colour with a shape (circle, square, triangle, spark) for colour-blind players.
 
@@ -242,7 +261,7 @@ Rule: text on Marigold, Coral, Teal or Lilac is always Ink (contrast). Answers a
 | Mascot | Role in the app | Files |
 |---|---|---|
 | **Quiz-show Host** (top hat, bow tie) | Kalakal Play: home page, lobby, question screen, reveal | `host.webp`, `host-happy/thinking/surprised.webp` |
-| **Sparkle Explorer** (goggles, cape) | Kalakal Kural: mode card, waiting for answers, end screen | `explorer.webp`, `explorer-*.webp` |
+| **Sparkle Explorer** (goggles, cape) | Kalakal Pulse: mode card, waiting for answers, end screen | `explorer.webp`, `explorer-*.webp` |
 | **Arcade Champion** (laurel, medal) | Podium and winners | `champion.webp`, `champion-*.webp` |
 
 Where expressions appear today:
@@ -252,7 +271,7 @@ Where expressions appear today:
 | Question running | Host thinking |
 | Last 5 seconds | Host surprised |
 | Answer revealed | Host happy |
-| Kural slide, no answers yet | Explorer thinking |
+| Pulse slide, no answers yet | Explorer thinking |
 | Error or "not your game" | Host surprised |
 
 ### Player characters (code-drawn)
@@ -282,7 +301,8 @@ Needs Node.js 20 or newer.
 
 ```bash
 npm install
-npm run dev            # http://localhost:8787
+npm run dev            # http://localhost:8787 (fake AI replies, no login needed)
+npm run dev:ai         # same, with the real AI model (needs: npx wrangler login)
 ```
 
 Host in one tab, join in another tab or from a phone on the same Wi-Fi (use the computer's IP address).
@@ -290,7 +310,7 @@ Host in one tab, join in another tab or from a phone on the same Wi-Fi (use the 
 ### Tests (run while `npm run dev` is running)
 
 ```bash
-npm test                                     # characters, names, milestones, question features, quiz + Kural bots
+npm test                                     # characters, names, milestones, question features, AI generator, quiz + Pulse bots
 node test/load-test.mjs http://localhost:8787 150   # 150 simulated players
 python3 test/screens.py                      # screenshots (needs Playwright + Chrome)
 ```
@@ -302,6 +322,15 @@ Checklist before pushing a visible change: home, host setup, lobby, a question, 
 Push to `main` on GitHub. Cloudflare Workers Builds deploys automatically (about a minute). Check the build under Cloudflare → Workers & Pages → kalakal → Deployments.
 
 Manual deploy (if ever needed): `npx wrangler login` then `npm run deploy`.
+
+### Own domain: kalakal.se
+
+1. Cloudflare dashboard → **Add a domain** → `kalakal.se` → Free plan. Cloudflare shows two nameservers (like `ana.ns.cloudflare.com`).
+2. At the registrar where kalakal.se was bought, replace the nameservers with Cloudflare's two. Takes from minutes to a few hours; Cloudflare emails when the domain is active.
+3. Workers & Pages → **kalakal** → Settings → **Domains & Routes** → Add → **Custom domain** → `kalakal.se`. Repeat for `www.kalakal.se`. Cloudflare creates the DNS records and the HTTPS certificate.
+4. Optional: Rules → Redirect Rules → send `www.kalakal.se/*` to `https://kalakal.se/${1}` so there is one address.
+
+The app uses whatever address it is opened on, so the lobby automatically shows "Join at kalakal.se". The workers.dev address keeps working.
 
 ### Roll back
 
@@ -324,7 +353,7 @@ Cloudflare → Workers & Pages → kalakal → Deployments → choose an earlier
 
 **Milestones** (animated on phones, pop-ups on the big screen): on fire at 3, 5, 7, 10 in a row (then every 5) · took the lead · entered the top 3 · comeback · perfect game. Rank-based milestones start after the first question.
 
-**Kural:** anonymous on screen. Poll votes can be changed. Word cloud merges the same word in any case. Q&A upvotes toggle and you cannot upvote your own question. The host can hide any text and mark questions answered.
+**Pulse:** anonymous on screen. Poll votes can be changed. Word cloud merges the same word in any case. Q&A upvotes toggle and you cannot upvote your own question. The host can hide any text and mark questions answered.
 
 **Safety:** nickname and text filter, duplicate names get a number, one answer per question, host-only controls via the secret host key, host can remove players and lock the lobby, "fun names only" switch.
 
@@ -343,13 +372,12 @@ Cloudflare → Workers & Pages → kalakal → Deployments → choose an earlier
 
 **Next (suggested order)**
 
-1. Built-in AI quiz generator (topic, pasted text, PDF) with a daily free limit.
-2. Sound effects and music (with a mute button).
-3. Accounts, saved quiz library, template gallery; pictures stored in R2 so phones can show them too.
-4. Team / house battles (Vizha mode).
-5. GIF search, picture reveal effects, co-editing, audience-submitted questions.
-6. Redraw player characters in the 3D-sticker mascot style.
-7. Mobile app (wraps the same web app).
+1. Sound effects and music (with a mute button).
+2. Accounts, saved quiz library, template gallery; pictures stored in R2 so phones can show them too.
+3. Team / house battles (Vizha mode).
+4. GIF search, picture reveal effects, co-editing, audience-submitted questions.
+5. Redraw player characters in the 3D-sticker mascot style.
+6. Mobile app (wraps the same web app).
 
 ---
 
@@ -362,6 +390,6 @@ Cloudflare → Workers & Pages → kalakal → Deployments → choose an earlier
 | Nov 2026 | No build step (plain HTML/CSS/JS) | Anyone can edit and deploy; fewer things to break |
 | Nov 2026 | Deploy from GitHub | Cloudflare upload cannot deploy Durable Objects; Git gives history and rollback |
 | Nov 2026 | Self-hosted fonts | Tamil shaping was broken with fallback fonts |
-| Nov 2026 | Two modes on the start screen (Play / Kural) | Users must understand the quiz vs feedback choice immediately |
+| Nov 2026 | Two modes on the start screen (Play / Pulse) | Users must understand the quiz vs feedback choice immediately |
 | Nov 2026 | Illustrated mascots for the crew, code-drawn characters for players | Brand quality where it matters, 2,800 unique looks at zero cost |
 | Nov 2026 | Originals in `design/` + rebuild script | Any designer can replace art without touching code |

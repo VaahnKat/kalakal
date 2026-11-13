@@ -4,7 +4,7 @@
 //
 // A session is a list of slides. Slide types:
 //   quiz      - question with a correct answer, timer, points       (Kalakal Play)
-//   poll      - multiple choice, live bar chart, no right answer    (Kalakal Kural)
+//   poll      - multiple choice, live bar chart, no right answer    (Kalakal Pulse)
 //   wordcloud - short words, bigger the more people send them
 //   open      - free-text answers shown as cards
 //   scale     - rate 1-4 statements from 1 to 5
@@ -13,6 +13,10 @@
 import { DurableObject } from "cloudflare:workers";
 import { FUN_NAMES, funName } from "../public/js/names.js";
 import { AVATAR_COUNT } from "../public/js/avatar.js";
+import { clean, isRude } from "./text.js";
+import { handleAi, AiQuota } from "./ai.js";
+
+export { AiQuota };
 
 const MAX_PLAYERS = 200;
 const MAX_SLIDES = 50;
@@ -22,8 +26,6 @@ const TYPES = ["quiz", "poll", "wordcloud", "open", "scale", "qa"];
 const LIMITS = { wordcloud: 3, open: 3, qa: 5 };           // submissions per person per slide
 const TEXT_MAX = { wordcloud: 25, open: 200, qa: 200 };
 const MAX_ITEMS = 2000;                                     // cap stored text items per slide
-// Short starter list; extend as needed. Matched as whole words (or inside squashed text for longer words).
-const BLOCKED = ["fuck", "fucking", "shit", "bitch", "cunt", "dick", "pussy", "nigger", "nigga", "whore", "slut", "fag", "rape", "nazi", "hitler", "porn", "sex", "asshole", "bastard"];
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
@@ -58,22 +60,14 @@ export default {
       return env.ROOMS.get(env.ROOMS.idFromName(m[1])).fetch(request);
     }
 
+    if (url.pathname.startsWith("/api/ai/")) return handleAi(request, env, url);
+
     if (url.pathname.startsWith("/api/")) return json({ error: "Not found" }, 404);
     return new Response("Not found", { status: 404 });
   },
 };
 
 // ---------- validation helpers ----------
-function clean(s, max) {
-  return String(s ?? "").replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim().slice(0, max);
-}
-
-function isRude(text) {
-  const lower = text.toLowerCase();
-  const words = lower.split(/[^a-z0-9]+/);
-  const squashed = lower.replace(/[^a-z]/g, "");
-  return BLOCKED.some((w) => words.includes(w) || (w.length >= 5 && squashed.includes(w)));
-}
 
 function validateSession(q) {
   if (!q || typeof q !== "object") return { error: "Missing quiz" };
@@ -397,7 +391,7 @@ export class GameRoom extends DurableObject {
     return [...this.players.values()].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
   }
 
-  // ----- interaction slides (Kalakal Kural) -----
+  // ----- interaction slides (Kalakal Pulse) -----
   newStore(s) {
     if (s.type === "poll") return { counts: s.answers.map(() => 0), voters: new Map() };
     if (s.type === "scale") return { sums: s.statements.map(() => 0), dist: s.statements.map(() => [0, 0, 0, 0, 0]), voters: new Map() };

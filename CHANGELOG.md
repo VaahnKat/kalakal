@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6 — 13 Nov 2026
+- **Create with AI** in the quiz builder: topic, or your own notes / PDF / text file; 5–20 questions; difficulty, audience, language (English, Tamil, Swedish and more), time, optional true/false
+- Review before adding: untick questions; New question, Harder, Easier, Better wrong answers on any question
+- Cloudflare Workers AI (Gemma 4 26B, fallback Llama 4 Scout); 5 free AI quizzes and 40 edits per person per day, site-wide budget inside the free tier; Copy AI prompt offered when it runs out
+- Feedback mode renamed **Kalakal Pulse** (was Kural)
+- Guide page: Way 4 is now Create with AI, new GIF, 4 new FAQ answers
+- Local development uses fake AI replies (`npm run dev`); `npm run dev:ai` for the real model; `test/ai-test.mjs`
+
 ## 0.5 — 13 Nov 2026
 - "Create your own quiz" page (`/create.html`), linked from the home page: five ways to create, each with a step-by-step GIF, a quick-type cheat sheet, spreadsheet column guide and FAQ
 - Paste or type questions: plain-text format (`*` right, `-` wrong) with live preview; also accepts rows copied from Excel / Google Sheets

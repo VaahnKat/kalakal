@@ -3,6 +3,7 @@ import { DEMO_QUIZ, DEMO_MEETING, SLIDE_TYPES, TYPE_LABEL, blankSlide } from "/j
 import { avatarSvg } from "/js/avatar.js";
 import { parseQuick, parseSpreadsheetFile, toCSV, TEMPLATE_CSV, aiPrompt, mediaFromLink } from "/js/quicktype.js";
 import { compressImage, ytThumb, mediaHtml, parseTime, fmtTime } from "/js/media.js";
+import { initAi } from "/js/ai-ui.js";
 
 const params = new URLSearchParams(location.search);
 let pin = (params.get("pin") || "").replace(/\D/g, "");
@@ -50,10 +51,11 @@ function openBuilder(mode) {
   builderMode = mode;
   draft = JSON.parse(localStorage.getItem("kalakal:draft:" + mode) || "null") || { title: "", questions: [blankSlide(mode === "play" ? "quiz" : "poll")] };
   draft.questions.forEach((q) => { if (!q.type) q.type = "quiz"; tidy(q); });
-  $("#builderMode").textContent = mode === "play" ? "Kalakal Play · Quiz game" : "Kalakal Kural · Live polls & feedback";
+  $("#builderMode").textContent = mode === "play" ? "Kalakal Play · Quiz game" : "Kalakal Pulse · Live polls & feedback";
   $("#builderMode").className = "mode-chip " + (mode === "kural" ? "kural" : "");
   $("#builderHint").textContent = mode === "play" ? "Players score points for right, fast answers." : "No scores: answers show live and anonymously.";
   $("#quizTitle").placeholder = mode === "play" ? "Friday team quiz" : "Monday team check-in";
+  $("#openAi").hidden = mode !== "play";
   const group = (m, label) => `<div class="stack" style="gap:10px"><p class="muted" style="font-weight:700">${label}</p><div class="type-picker">${SLIDE_TYPES.filter((t) => t.mode === m).map((t) => `<button class="type-btn" type="button" data-type="${t.type}"><strong>${t.label}</strong><span>${t.hint}</span></button>`).join("")}</div></div>`;
   $("#typePicker").innerHTML = mode === "play"
     ? group("play", "Quiz games") + group("kural", "Mix in a poll or feedback slide (optional)")
@@ -229,6 +231,11 @@ function addSlides(slides, replace) {
   draft.questions = keep.concat(slides.map(tidy)).slice(0, 50);
   saveDraft(); renderEditor();
 }
+initAi({
+  add: (slides) => { addSlides(slides, false); $("#draftNote").textContent = `Added ${slides.length} AI questions. Check them before you play.`; },
+  title: () => draft.title.trim(),
+  fallback: () => { $("#openPaste").click(); $("#copyPrompt").click(); },
+});
 for (const [id, replace] of [["pasteAdd", false], ["pasteReplace", true]]) {
   $("#" + id).addEventListener("click", () => {
     const slides = previewPaste();
@@ -456,7 +463,7 @@ function finished(m) {
   confetti(100);
 }
 
-// ----- interaction slides (Kalakal Kural) -----
+// ----- interaction slides (Kalakal Pulse) -----
 const HINTS = {
   poll: "Vote on your phone. You can change your vote.",
   wordcloud: "Send up to 3 words from your phone.",
@@ -571,5 +578,5 @@ function message(title, text, mood, withNext = false) {
 
 const build = params.get("build");
 if (pin) openGame();
-else if (build === "play" || build === "kural") { openBuilder(build); if (params.get("paste")) $("#openPaste").click(); }
+else if (build === "play" || build === "kural") { openBuilder(build); if (params.get("paste")) $("#openPaste").click(); else if (params.get("ai") && build === "play") $("#openAi").click(); }
 else show("setup");

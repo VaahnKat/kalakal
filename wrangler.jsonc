@@ -4,8 +4,29 @@
   "main": "src/index.js",
   "compatibility_date": "2025-09-01",
   "assets": { "directory": "./public" },
+  "ai": { "binding": "AI" },
   "durable_objects": {
-    "bindings": [{ "name": "ROOMS", "class_name": "GameRoom" }]
+    "bindings": [
+      { "name": "ROOMS", "class_name": "GameRoom" },
+      { "name": "AI_QUOTA", "class_name": "AiQuota" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }]
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["GameRoom"] },
+    { "tag": "v2", "new_sqlite_classes": ["AiQuota"] }
+  ],
+  "observability": { "enabled": true },
+  // Local development without a Cloudflare login: no AI binding, fake AI replies (npm run dev).
+  // "npm run dev:ai" uses the real model and needs "npx wrangler login".
+  "env": {
+    "local": {
+      "vars": { "AI_MOCK": "1" },
+      "durable_objects": {
+        "bindings": [
+          { "name": "ROOMS", "class_name": "GameRoom" },
+          { "name": "AI_QUOTA", "class_name": "AiQuota" }
+        ]
+      }
+    }
+  }
 }

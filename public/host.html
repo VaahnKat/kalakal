@@ -50,6 +50,29 @@
   .media-stage { display: flex; align-items: center; justify-content: center; gap: 24px; width: 100%; }
   .q-media { max-width: min(100%, 900px); max-height: 38vh; border-radius: 18px; filter: drop-shadow(0 10px 30px rgba(0,0,0,.35)); object-fit: contain; }
   .q-video { width: min(100%, 68vh); aspect-ratio: 16 / 9; height: auto; border: 0; }
+  .ai-btn { background: linear-gradient(90deg, var(--marigold), var(--coral)); }
+  .ai-btn span { margin-right: 4px; }
+  dialog.ai { width: min(920px, 94vw); }
+  .ai-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr)); gap: 12px; }
+  .ai-opts .field select, .ai-opts .field input { width: 100%; }
+  .ai-src { background: var(--ink); border: 1px solid var(--line); border-radius: 14px; padding: 4px 16px; }
+  .ai-src summary { cursor: pointer; font-weight: 800; padding: 12px 0; }
+  .ai-src textarea { width: 100%; min-height: 140px; background: var(--night); color: var(--cream); border: 2px solid var(--line); border-radius: 12px; padding: 12px; font: 16px/1.5 var(--body); resize: vertical; }
+  .ai-left { border-radius: 99px; padding: 3px 12px; font-weight: 800; font-size: 14px; background: var(--ink); border: 1px solid var(--line); color: var(--soft); }
+  .ai-busy { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 40px 0; text-align: center; }
+  .ai-list { display: flex; flex-direction: column; gap: 12px; max-height: 56vh; overflow: auto; padding-right: 4px; }
+  .ai-q { background: var(--ink); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .ai-q.off { opacity: .45; }
+  .ai-q.busy { opacity: .6; pointer-events: none; }
+  .ai-q-head { display: flex; gap: 12px; align-items: flex-start; }
+  .ai-q-head input { width: 22px; height: 22px; margin-top: 3px; accent-color: var(--marigold); flex-shrink: 0; }
+  .ai-q-head p { font-weight: 800; font-size: 18px; }
+  .ai-ans { display: flex; flex-wrap: wrap; gap: 6px 8px; padding-left: 34px; }
+  .ai-ans span { border-radius: 99px; padding: 3px 12px; font-size: 15px; background: var(--night); border: 1px solid var(--line); color: var(--soft); }
+  .ai-ans span.r { background: var(--teal); border-color: var(--teal); color: var(--ink); font-weight: 800; }
+  .ai-tools { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 26px; }
+  .ai-tools button { min-height: 36px; font-size: 14px; }
+  .ai-warn { background: rgba(255,182,39,.12); border: 1px solid rgba(255,182,39,.5); border-radius: 12px; padding: 10px 14px; font-size: 15px; }
   .x2 { background: var(--coral); color: var(--ink); border-radius: 99px; padding: 4px 14px; font-weight: 800; font-size: 18px; }
   .q-ans svg { width: 22px; height: 22px; flex-shrink: 0; }
   select { min-height: 44px; width: auto; font-size: 16px; }
@@ -152,7 +175,7 @@
           <img class="mascot float mode-mascot" src="/img/mascots/explorer.webp" alt="" width="118" height="124" style="top: -100px; right: 4px">
           <div class="mode-head">
             <div class="mode-icon"><svg aria-hidden="true" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#160B2A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5 h16 v11 h-9 l-5 4 v-4 h-2 z"/><path d="M8 10 h8"/></svg></div>
-            <div><p class="eyebrow" style="color: var(--teal)">Kalakal Kural</p><h2>Live polls &amp; feedback</h2></div>
+            <div><p class="eyebrow" style="color: var(--teal)">Kalakal Pulse</p><h2>Live polls &amp; feedback</h2></div>
           </div>
           <p class="mode-lead">Hear everyone. Answers appear live on the big screen, anonymously.</p>
           <ul class="mode-list"><li>Polls, word clouds and open questions</li><li>Scales from 1 to 5 and live Q&amp;A with upvotes</li><li>No scores, no pressure, honest input</li></ul>
@@ -180,7 +203,8 @@
       <div class="card stack" style="gap: 12px">
         <p class="eyebrow">Fast ways to add questions</p>
         <div class="fast">
-          <button class="btn btn-primary btn-sm" type="button" id="openPaste">Paste or type questions</button>
+          <button class="btn btn-primary btn-sm ai-btn" type="button" id="openAi"><span aria-hidden="true">✦</span> Create with AI</button>
+          <button class="btn btn-ghost btn-sm" type="button" id="openPaste">Paste or type questions</button>
           <button class="btn btn-ghost btn-sm" type="button" id="importBtn">Import spreadsheet</button>
           <button class="btn btn-ghost btn-sm" type="button" id="templateBtn">Download template</button>
           <button class="btn btn-ghost btn-sm" type="button" id="exportBtn">Export as spreadsheet</button>
@@ -262,7 +286,7 @@
   </div>
 </section>
 
-<!-- 7. Interaction slide (Kalakal Kural) -->
+<!-- 7. Interaction slide (Kalakal Pulse) -->
 <section class="screen" data-screen="engage" hidden>
   <div class="wrap stage">
     <div class="footer-bar" style="padding-top: 20px"><div class="row"><span class="eyebrow" id="eNum"></span><span class="type-tag" id="eType"></span></div><span style="font-weight: 800; font-size: 20px" id="eCount"></span></div>
@@ -292,6 +316,41 @@
 </section>
 
 <script src="/vendor/qrcode.js"></script>
+<dialog class="paste ai" id="aiDlg" aria-labelledby="aiTitle">
+  <div class="stack" style="gap: 16px" id="aiForm">
+    <div class="row" style="justify-content: space-between"><div class="row"><h2 id="aiTitle" style="font-size: 26px">Create with AI</h2><span class="ai-left" id="aiLeft"></span></div><button class="icon-btn" type="button" data-ai="close" aria-label="Close">Close</button></div>
+    <div class="field"><label for="aiTopic">What should the quiz be about?</label><input id="aiTopic" type="text" maxlength="200" placeholder="e.g. Pongal festival, the solar system, Swedish football, our company history"></div>
+    <details class="ai-src" id="aiSrcBox"><summary>Or use your own notes, an article or a PDF</summary>
+      <div class="stack" style="gap: 10px; padding-bottom: 14px">
+        <textarea id="aiSource" placeholder="Paste lesson notes, an article or meeting text. The AI will only ask about what's in it." aria-label="Your notes"></textarea>
+        <div class="row"><button class="btn btn-ghost btn-sm" type="button" id="aiFileBtn">Use a PDF or text file</button><span class="muted" id="aiFileNote"></span><input type="file" id="aiFile" accept=".pdf,.txt,.md,application/pdf,text/plain" hidden></div>
+      </div>
+    </details>
+    <div class="ai-opts">
+      <div class="field"><label for="aiCount">Questions</label><select id="aiCount"><option>5</option><option selected>10</option><option>15</option><option>20</option></select></div>
+      <div class="field"><label for="aiLevel">Difficulty</label><select id="aiLevel"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option><option value="mixed">Mixed</option></select></div>
+      <div class="field"><label for="aiAudience">Who is playing?</label><select id="aiAudience"><option value="everyone" selected>Everyone</option><option value="kids">Kids 6–9</option><option value="tweens">Kids 10–13</option><option value="teens">Teenagers</option><option value="adults">Adults</option></select></div>
+      <div class="field"><label for="aiLang">Language</label><select id="aiLang"><option>English</option><option value="Tamil">Tamil · தமிழ்</option><option value="Swedish">Swedish · Svenska</option><option>Hindi</option><option>Spanish</option><option>French</option><option>German</option><option>Arabic</option><option>Finnish</option><option>Norwegian</option><option>Danish</option><option value="other">Other…</option></select></div>
+      <div class="field" id="aiLangOtherBox" hidden><label for="aiLangOther">Which language?</label><input id="aiLangOther" type="text" maxlength="30" placeholder="e.g. Malayalam"></div>
+      <div class="field"><label for="aiTime">Time per question</label><select id="aiTime"><option value="10">10 s</option><option value="15">15 s</option><option value="20" selected>20 s</option><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option></select></div>
+    </div>
+    <label class="row" style="gap: 10px; font-weight: 700"><input type="checkbox" id="aiTF" style="width: 22px; height: 22px; accent-color: var(--marigold)"> Include some true-or-false questions</label>
+    <p class="error" id="aiErr" role="alert" hidden></p>
+    <div class="row" style="justify-content: space-between"><button class="btn btn-ghost btn-sm" type="button" id="aiPrompt" hidden>Use Copy AI prompt instead</button><span></span><button class="btn btn-primary" type="button" id="aiGo">Write my quiz</button></div>
+  </div>
+  <div class="ai-busy" id="aiBusy" hidden>
+    <img class="mascot float" src="/img/mascots/explorer-thinking.webp" alt="" width="120" height="177">
+    <h2 style="font-size: 26px" id="aiBusyTitle">Writing your questions…</h2>
+    <p class="muted">Usually 10 to 30 seconds.</p>
+  </div>
+  <div class="stack" style="gap: 14px" id="aiReview" hidden>
+    <div class="row" style="justify-content: space-between"><h2 style="font-size: 26px">Check your questions</h2><button class="icon-btn" type="button" data-ai="close" aria-label="Close">Close</button></div>
+    <p class="ai-warn"><strong>AI can be wrong.</strong> Read each right answer (in green) before you play. Untick a question to leave it out, or ask for a new version.</p>
+    <div class="ai-list" id="aiList"></div>
+    <p class="error" id="aiReviewErr" role="alert" hidden></p>
+    <div class="row" style="justify-content: space-between"><button class="btn btn-ghost btn-sm" type="button" id="aiBack">Change settings</button><button class="btn btn-primary" type="button" id="aiAdd">Add to quiz</button></div>
+  </div>
+</dialog>
 <dialog class="paste" id="pasteDlg" aria-labelledby="pasteTitle">
   <div class="stack" style="gap: 14px">
     <div class="row" style="justify-content: space-between"><h2 id="pasteTitle" style="font-size: 26px">Paste or type questions</h2><button class="icon-btn" type="button" id="pasteClose" aria-label="Close">Close</button></div>

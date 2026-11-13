@@ -56,8 +56,8 @@ class Rec:
         # An open <dialog> sits in the browser's top layer: move the overlay inside it so it stays visible
         await self.page.evaluate("""() => { const host = document.querySelector('dialog[open]') || document.body;
             for (const id of ['kk-cur', 'kk-ring', 'kk-cap', 'kk-ai']) { const el = document.getElementById(id); if (el && el.parentNode !== host) host.appendChild(el); } }""")
-        await self.page.evaluate("""() => { const h = document.getElementById('joinHost'); if (h) h.textContent = 'kalakal.prabhuwinz17.workers.dev';
-            const e = document.getElementById('eJoin'); if (e) e.textContent = e.textContent.replace(/Join at \\S+/, 'Join at kalakal.prabhuwinz17.workers.dev'); }""")
+        await self.page.evaluate("""() => { const h = document.getElementById('joinHost'); if (h) h.textContent = 'kalakal.se';
+            const e = document.getElementById('eJoin'); if (e) e.textContent = e.textContent.replace(/Join at \\S+/, 'Join at kalakal.se'); }""")
 
     async def shot(self, ms=120):
         png = await self.page.screenshot(type="png")
@@ -227,44 +227,26 @@ async def rec_sheet(ctx):
     r.save("spreadsheet")
 
 
-AI_REPLY = """Which planet is closest to the Sun?
-* Mercury
-- Venus
-- Mars
-- Earth
-
-How many legs does a spider have?
-- Six
-* Eight
-- Ten
-
-Which gas do plants take in?
-* Carbon dioxide
-- Oxygen
-- Helium"""
-
-
 async def rec_ai(ctx):
     page = await builder(ctx); r = Rec(page); await r.ready()
-    await page.fill("#quizTitle", "Science for kids")
-    await r.click("#openPaste", 600)
-    await r.caption("1 · Press “Copy AI prompt”", 1000)
-    await r.click("#copyPrompt", 900)
-    # A neutral stand-in for any AI chat app
-    await page.evaluate("""() => { const d = document.createElement('div'); d.id = 'kk-ai';
-      d.style.cssText = 'position:fixed;inset:60px 140px 90px;z-index:9000;background:#fff;color:#222;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.5);padding:26px;font:16px/1.45 system-ui,sans-serif;overflow:hidden';
-      d.innerHTML = '<p style="font-weight:700;margin:0 0 14px">Your AI chat (ChatGPT, Claude, Gemini…)</p><div style="background:#eef0f4;border-radius:12px;padding:12px 14px;margin:0 0 14px 120px">Write 3 multiple-choice quiz questions about science for kids… (the copied prompt)</div><pre id="kk-ai-out" style="white-space:pre-wrap;font:15px/1.45 ui-monospace,monospace;margin:0"></pre>';
-      (document.querySelector('dialog[open]') || document.body).appendChild(d); }""")
-    await r.ready()
-    await r.caption("2 · Paste it into your AI chat and get the questions", 900)
-    for i in range(0, len(AI_REPLY), 24):
-        await page.evaluate("t => document.getElementById('kk-ai-out').textContent = t", AI_REPLY[:i + 24]); await r.shot(110)
-    await r.caption("3 · Copy the reply", 1200)
-    await page.evaluate("document.getElementById('kk-ai').remove()")
-    await r.caption("4 · Paste it back into Kalakal and check the facts", 900)
-    await page.fill("#pasteText", AI_REPLY); await page.dispatch_event("#pasteText", "input"); await r.shot(1800)
-    await r.click("#pasteAdd", 700)
-    await page.evaluate("window.scrollTo(0, 240)"); await r.caption("Done: questions ready to edit", 2400)
+    await page.evaluate("fetch('/api/ai/reset', {method: 'POST'})")
+    await page.fill("#quizTitle", "Space quiz")
+    await r.caption("1 · Press “Create with AI”", 1000)
+    await r.click("#openAi", 700)
+    await page.fill("#aiTopic", "")
+    await r.caption("2 · Say what it's about (or add notes or a PDF)", 800)
+    await r.type("#aiTopic", "The solar system", chunk=4)
+    await r.caption("3 · Choose how many, how hard, who's playing, language", 1000)
+    await r.move("#aiAudience"); await page.select_option("#aiAudience", "tweens"); await r.shot(600)
+    await r.click("#aiGo", 250)
+    await r.shot(900)
+    await page.wait_for_selector("#aiReview:not([hidden])"); await page.wait_for_timeout(300)
+    await r.caption("4 · Check every answer. Fix any question with one tap", 1400)
+    await r.click('[data-i="1"] [data-act="distractors"]', 900)
+    await r.click('[data-i="2"] input[type=checkbox]', 500)
+    await r.caption("5 · Add the ones you like to your quiz", 900)
+    await r.click("#aiAdd", 700)
+    await page.evaluate("window.scrollTo(0, 240)"); await r.caption("Done: edit them like any other question", 2400)
     r.save("ai")
 
 

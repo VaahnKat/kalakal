@@ -77,10 +77,10 @@
     <div class="stack" style="gap: 18px">
       <p class="eyebrow">Create your own quiz</p>
       <h1>Your own quiz, ready in a minute.</h1>
-      <p class="muted lead">Type it, paste it, bring a spreadsheet or let your AI chat write the first draft. Add pictures, GIFs and videos. Free, no account needed.</p>
+      <p class="muted lead">Let Kalakal's AI write it, type or paste it, or bring a spreadsheet. Add pictures, GIFs and videos. Free, no account needed.</p>
       <div class="row">
         <a class="btn btn-primary" href="/host.html?build=play">Start a quiz</a>
-        <a class="btn btn-ghost" href="/host.html?build=kural">Make polls &amp; feedback instead</a>
+        <a class="btn btn-ghost" href="/host.html?build=kural">Make a Pulse session: polls &amp; feedback</a>
       </div>
     </div>
     <img class="mascot float" src="/img/mascots/explorer.webp" alt="" width="300" height="315">
@@ -90,7 +90,7 @@
     <a class="way-card" href="#paste"><span class="num" style="background: var(--marigold)">1</span><strong>Type or paste</strong><span>Write a whole quiz like a text message</span><span class="tag">Fastest</span></a>
     <a class="way-card" href="#editor"><span class="num" style="background: var(--teal)">2</span><strong>Question by question</strong><span>Fill in boxes, tap the right answer</span></a>
     <a class="way-card" href="#spreadsheet"><span class="num" style="background: var(--coral)">3</span><strong>From a spreadsheet</strong><span>Excel, Google Sheets or a CSV file</span></a>
-    <a class="way-card" href="#ai"><span class="num" style="background: var(--lilac)">4</span><strong>With your AI chat</strong><span>ChatGPT, Claude or Gemini writes a draft</span></a>
+    <a class="way-card" href="#ai"><span class="num" style="background: var(--lilac)">4</span><strong>Create with AI</strong><span>A topic, notes or a PDF become questions</span><span class="tag" style="background: var(--lilac)">New</span></a>
     <a class="way-card" href="#media"><span class="num" style="background: var(--cream)">5</span><strong>Pictures &amp; videos</strong><span>Images, GIFs and YouTube clips</span></a>
   </nav>
 
@@ -157,21 +157,22 @@
 
   <section class="way" id="ai">
     <div class="stack" style="gap: 16px">
-      <p class="eyebrow">Way 4</p>
-      <h2>Let your AI chat write a draft</h2>
-      <p class="muted pitch">Kalakal gives you a ready-made prompt. Your AI writes the questions in exactly the format Kalakal reads.</p>
+      <p class="eyebrow">Way 4 · New</p>
+      <h2>Create it with AI</h2>
+      <p class="muted pitch">Say what the quiz is about, or give it your own notes or a PDF. Kalakal's AI writes the questions, you check them and add the ones you like.</p>
       <ol class="steps">
-        <li>Open <strong>Paste or type questions</strong> and press <strong>Copy AI prompt</strong>.</li>
-        <li>Paste it into ChatGPT, Claude, Gemini or any AI chat. Change the topic, audience and number of questions.</li>
-        <li>Copy the AI's reply and paste it back into Kalakal.</li>
-        <li><strong>Check every answer</strong> in the preview: AI can be confidently wrong. Then press Add to quiz.</li>
+        <li>In the quiz builder, press <strong>Create with AI</strong>.</li>
+        <li>Write a topic, like "the solar system" or "Pongal festival". Or open <strong>use your own notes</strong> and paste text or pick a PDF: the AI then only asks about what's in it.</li>
+        <li>Choose the number of questions, difficulty, who's playing and the language (English, Tamil, Swedish and more).</li>
+        <li><strong>Check every answer.</strong> Tap <strong>New question</strong>, <strong>Harder</strong>, <strong>Easier</strong> or <strong>Better wrong answers</strong> to fix one, or untick it.</li>
+        <li>Press <strong>Add to quiz</strong>. The questions work like any others: edit them, add pictures, play.</li>
       </ol>
-      <p class="best"><strong>Best for:</strong> a quick first draft on any topic. A built-in AI generator is coming next.</p>
-      <div class="row"><a class="btn btn-primary btn-sm" href="/host.html?build=play&amp;paste=1">Get the prompt</a></div>
+      <p class="best"><strong>Free:</strong> 5 AI quizzes a day per person. Prefer ChatGPT, Claude or Gemini? Use <strong>Copy AI prompt</strong> in the paste window and paste the reply back.</p>
+      <div class="row"><a class="btn btn-primary btn-sm" href="/host.html?build=play&amp;ai=1">Try Create with AI</a></div>
     </div>
     <figure class="way-media">
-      <picture><source srcset="/img/guide/ai.webp" media="(prefers-reduced-motion: reduce)"><img src="/img/guide/ai.gif" alt="Animation: pressing Copy AI prompt, an AI chat replying with three questions in Kalakal's format, and the reply pasted back into Kalakal and added." width="840" height="525" loading="lazy"></picture>
-      <figcaption>Prompt out, questions back, checked and added.</figcaption>
+      <picture><source srcset="/img/guide/ai.webp" media="(prefers-reduced-motion: reduce)"><img src="/img/guide/ai.gif" alt="Animation: pressing Create with AI, typing the topic The solar system, choosing kids 10 to 13, reviewing the questions, asking for better wrong answers on one, unticking another and adding them to the quiz." width="840" height="525" loading="lazy"></picture>
+      <figcaption>A topic in, ten questions out, checked and added.</figcaption>
     </figure>
   </section>
 
@@ -257,7 +258,11 @@ Best snack for the break?
         <p><strong>GIFs:</strong> upload one up to 1.5 MB, or paste a link to a GIF online.</p>
         <p><strong>Videos:</strong> paste a YouTube link and choose the start and end. Uploading your own video files isn't possible yet.</p>
         <p>Pictures and videos show on the big screen. Phones show the answer buttons, which keeps the game fast for everyone.</p></div></details>
-      <details><summary>Can AI write my quiz?</summary><div class="a"><p>Yes, with any AI chat you already use. Press <strong>Copy AI prompt</strong> in the paste window, paste it into ChatGPT, Claude or Gemini, change the topic, and paste the reply back. Always check the answers: AI sometimes gets facts wrong. A built-in generator is coming next.</p></div></details>
+      <details><summary>Can AI write my quiz?</summary><div class="a"><p>Yes. In the builder press <strong>Create with AI</strong>, write a topic (or paste notes or pick a PDF), choose the number of questions, difficulty, audience and language, and press <strong>Write my quiz</strong>. You'll see every question before anything is added.</p><p><strong>Always check the answers.</strong> AI can be confidently wrong, especially on recent events, local facts and numbers. Use <strong>New question</strong>, <strong>Harder</strong>, <strong>Easier</strong> or <strong>Better wrong answers</strong> to fix a question, or untick it.</p></div></details>
+      <details><summary>How many AI quizzes can I make?</summary><div class="a"><p><strong>5 AI quizzes a day</strong> per person, each up to 20 questions, plus 40 single-question changes. The count resets every night at 1 am Swedish time (2 am in summer). If you run out, use <strong>Copy AI prompt</strong> in the paste window with ChatGPT, Claude or Gemini. It's unlimited and the reply pastes straight back in.</p></div></details>
+      <details><summary>Can the AI write in Tamil or Swedish?</summary><div class="a"><p>Yes. Pick the language before you press Write my quiz: English, Tamil, Swedish, Hindi and several more, or type any other language under <strong>Other…</strong>. Quality is best in English and widely used languages; in Tamil, read the questions carefully and fix any odd wording in the editor.</p></div></details>
+      <details><summary>Can the AI make a quiz from my own notes or a PDF?</summary><div class="a"><p>Yes. Open <strong>Or use your own notes, an article or a PDF</strong>, paste the text or pick a PDF or .txt file. The AI then only asks about what's in your text, which is great for lessons, training and company onboarding. It reads up to about 12,000 characters (roughly 5 pages). Scanned PDFs without real text can't be read: copy the text instead. Word and PowerPoint: copy the text and paste it.</p></div></details>
+      <details><summary>What happens to my notes and topics? Is my data used for training?</summary><div class="a"><p>Your topic and notes are sent to Cloudflare Workers AI to write the questions, and aren't stored by Kalakal. Cloudflare doesn't use them to train models. Don't paste personal or confidential information you wouldn't want processed by an AI service.</p></div></details>
       <details><summary>Which spreadsheet apps work?</summary><div class="a"><p>Any of them: Excel, Google Sheets, Apple Numbers or LibreOffice. The quickest way is to select the rows, copy and paste them into <strong>Paste or type questions</strong>. To import a file, save it as <strong>CSV</strong> first (in Google Sheets: File → Download → CSV). The <a href="#columns">column guide</a> lists what goes where.</p></div></details>
       <details><summary>Can I write questions in Tamil, Swedish or other languages?</summary><div class="a"><p>Yes, any language, and you can mix languages in one quiz. Tamil script is fully supported on the big screen and on phones.</p></div></details>
       <details><summary>Can I mix polls, word clouds and Q&amp;A into a quiz?</summary><div class="a"><p>Yes. In the builder, under <strong>Add a slide</strong>, you can add polls, word clouds, open questions, 1–5 scales and Q&amp;A between quiz questions. They don't affect the scores.</p></div></details>

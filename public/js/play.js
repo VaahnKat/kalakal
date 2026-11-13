@@ -202,7 +202,7 @@ function message(title, text, mood) {
   show("message");
 }
 
-// ---------- interaction slides (Kalakal Kural) ----------
+// ---------- interaction slides (Kalakal Pulse) ----------
 let eng = null; // { index, slide, mine, left, items, myVotes:Set, myItems:Set, sent:[] }
 
 function engageStart(m) {

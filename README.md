@@ -1,71 +1,39 @@
-# Kalakal — live quizzes anyone can join with a PIN
+# Kalakal
 
-Version 0.3. Host quizzes **and** live audience interaction on a big screen; players join on their phones with a 6-digit PIN or QR code. No app, no account.
+Live quizzes and audience interaction anyone can join with a PIN. Host on a big screen, play on phones. No app, no account.
 
-## What works today
-**New in 0.3: characters, fun names and celebrations**
-- Two clear modes on the host start screen: **Kalakal Play** (quiz games) and **Kalakal Kural** (live polls & feedback); the builder opens in the chosen mode and can still mix both
-- Every player gets a character: Minni (spark) or Bubbi (voice bubble, echoes the logo) in 4 colours, 14 outfits (crown, superhero, wizard, DJ, cricketer, viking, chef, graduate, malli poo, ninja, winter, astronaut…) and eyewear: 2,800 looks. "New look" button on join and in the lobby. Gallery at `/avatars.html`
-- Fun names: "Surprise me" button and name ideas on the join screen (1,150 combos like Captain Dosa, Turbo Penguin); host can switch on **Fun names only** so nobody types a name
-- Milestones with animated reactions: on fire (3/5/7/10 in a row), took the lead, entered the top 3, comeback, perfect game. Phones show the player's own character reacting; the scoreboard shows highlight pop-ups and fire effects; the podium shows the winners' characters dancing
+**Live:** https://kalakal.prabhuwinz17.workers.dev · **Version:** 0.4 · **Full documentation:** [docs/HANDBOOK.md](docs/HANDBOOK.md)
 
-**Kalakal Kural (new in 0.2): audience interaction, mixable with quiz questions in one session**
-- **Poll:** live bar chart with percentages; players can change their vote
-- **Word cloud:** up to 3 words each; same words (any case) merge and grow
-- **Open question:** up to 3 answers each, shown as a card wall; host can hide any card
-- **Scale:** rate 1–4 statements from 1 to 5; live average and distribution
-- **Q&A:** up to 5 questions each, upvotes (toggle, not your own), sorted live; host marks answered or hides
-- Anonymous on screen, rude-word filter on every text, results summary in the CSV download
-- Ready-made "Team meeting warm-up" session; builder has a slide-type picker and reorder
+| Mode | Like | What players do |
+|---|---|---|
+| **Kalakal Play** | Kahoot | Answer timed quiz questions for points, streaks and the podium |
+| **Kalakal Kural** | Mentimeter | Polls, word clouds, open questions, 1–5 scales and live Q&A, anonymously |
 
-**Kalakal Play (quiz)**
-- **Host:** ready-made 10-question quiz, or build your own (up to 50 questions, 2–4 answers, 10–60 s each; draft saved in the browser)
-- **Lobby:** big PIN, QR code, players appear live, tap a name to remove someone, lock the lobby
-- **Game:** countdown ring, live "answered" counter, auto-reveal when everyone has answered, answer chart, scoreboard, podium with confetti, results download (CSV)
-- **Players:** join with PIN + nickname, big shape+colour answer buttons, instant feedback (points, streak, rank), final placing
-- **Scoring:** up to 1,000 points for speed (at least 500 for any correct answer) + streak bonus (+100 per correct answer in a row, max +500)
-- **Safety:** nickname filter, duplicate names get a number, one answer per question, the correct answer never reaches phones before the reveal, only the host's browser can control the game
-- **Reliability:** players who refresh or lose Wi-Fi rejoin with their score; the host can refresh and continue
-- **Tested:** full games with 25, 50 and 150 simulated players (`npm run loadtest`) and every interaction type with 40 players (`node test/engage-test.mjs`)
+Every player gets a character (2,800 looks), can take a fun name like *Captain Dosa*, and sees animated reactions for streaks, taking the lead and reaching the top 3.
 
-## Run it on your computer
-Needs [Node.js 20+](https://nodejs.org).
+## Quick start
+
 ```bash
 npm install
-npm run dev
-```
-Open http://localhost:8787 — host on one tab, join from another tab or from your phone (same Wi-Fi: use your computer's IP address instead of localhost).
-
-Load test (while `npm run dev` is running):
-```bash
-node test/load-test.mjs http://localhost:8787 25
+npm run dev        # http://localhost:8787
+npm test           # in a second terminal, while dev is running
 ```
 
-## Put it online (free, about 10 minutes)
-1. Create a free account at **dash.cloudflare.com/sign-up**.
-2. In this folder run:
-   ```bash
-   npx wrangler login      # opens the browser, click Allow
-   npm run deploy
-   ```
-3. Wrangler prints your live address, like `https://kalakal.<your-name>.workers.dev`. That's it: share it and play.
+Push to `main` and Cloudflare deploys automatically.
 
-**Your own domain later** (e.g. kalakal.app): add the domain to Cloudflare, then in the dashboard go to Workers & Pages → kalakal → Settings → Domains & Routes → Add custom domain.
+## Project map
 
-## How it's built
-| Part | Where |
+| Folder | What is in it |
 |---|---|
-| Website (home, host, player screens) | `public/` — plain HTML, CSS and JavaScript, no build step |
-| API + live game rooms | `src/index.js` — one Cloudflare Worker; each PIN is a Durable Object holding the game in memory |
-| Brand | `public/css/kalakal.css`, logos in `public/img/`, fonts self-hosted in `public/fonts/` (SIL OFL) |
-| QR codes | `public/vendor/qrcode.js` (MIT, Kazuhiko Arase) |
-| Characters and names | `public/js/avatar.js` (SVG character builder), `public/js/names.js` — shared by browser and server |
-| Tests | `test/load-test.mjs` (quiz bots), `test/engage-test.mjs` (interaction bots), `test/fun-test.mjs` (characters, names, milestones), `test/screens*.py` (screenshots with Playwright) |
+| `src/` | Server: API and live game rooms (Cloudflare Worker + Durable Object) |
+| `public/` | Website: home, host and player screens, styles, images, fonts |
+| `design/` | Original artwork: logo SVGs, full-size mascot PNGs |
+| `tools/` | `build_mascots.py`: rebuilds web images from `design/` (`npm run mascots`) |
+| `test/` | Bot tests (quiz, Kural, characters) and screenshot scripts |
+| `docs/` | Handbook: architecture, change guide, brand, deploy, roadmap |
 
-Runs on Cloudflare's free Workers plan (SQLite-backed Durable Objects). Limits per game: 200 players, 50 questions.
+How to change content, rules, colours or mascots: see the **Change guide** in [docs/HANDBOOK.md](docs/HANDBOOK.md#4-change-guide).
 
-## Known limits in 0.1 (next steps)
-- Quizzes live in the host's browser; there are no accounts or saved quiz library yet
-- Game state is kept in memory for the length of a game; very long idle games may be cleared
-- Avatars, power-ups, team mode and image slides are planned next
-- Add a privacy policy and terms before opening it to the public
+## Credits and licences
+
+Fonts: Unbounded and Catamaran (SIL Open Font License). QR codes: qrcode-generator by Kazuhiko Arase (MIT). Mascot artwork © Kalakal.

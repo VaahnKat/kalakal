@@ -341,6 +341,7 @@
   .aw-k { font-size: 13px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--marigold); }
   .aw-n { font-weight: 800; font-size: 20px; line-height: 1.1; }
   .aw-d { font-size: 15px; color: var(--soft); }
+  body:has([data-screen="editor"]:not([hidden])) .mute-btn, body:has([data-screen="setup"]:not([hidden])) .mute-btn { display: none; }
 </style>
 </head>
 <body>
@@ -573,7 +574,7 @@
     <h1 class="q-title" id="qTitle"></h1>
     <div class="grow media-stage"><div id="qMedia" hidden></div><div class="float" id="qMinni"></div></div>
     <div class="answers" id="qAnswers"></div>
-    <div class="footer-bar"><p style="font-size: 22px; font-weight: 800" id="answered"></p><button class="btn btn-ghost btn-sm" type="button" id="skipBtn">End question</button></div>
+    <div class="footer-bar" style="flex-wrap: nowrap"><p style="font-size: 22px; font-weight: 800; white-space: nowrap" id="answered"></p><div class="who-row" id="whoRow" aria-hidden="true"></div><button class="btn btn-ghost btn-sm" type="button" id="skipBtn">End question</button></div>
   </div>
 </section>
 

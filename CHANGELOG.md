@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10 — 14 Nov 2026
+- **Sound** (made in the browser, no audio files): player joins, game start, new question, a rising beep for each of the last 5 seconds, time's up, reveal, scoreboard and a podium fanfare on the big screen; right, wrong, milestone and final sounds on phones
+- **Each player has their own jingle**, made from their name and character: it plays on their phone when they answer and on the big screen, where their character pops in next to "answered"
+- Timer pulses in the last 5 seconds; sound on/off button on the big screen and phones (remembered per device)
+- Sounds live in `public/js/sound.js` (`SFX` list, `jingle`)
+
 ## 0.9 — 14 Nov 2026
 - **Player motivation:** result screen shows answer time, streak bonus, places gained and who to chase (or your lead); a lost streak is acknowledged; "Fastest right answer" each question
 - **Awards** for games with 4+ players: Fastest fingers, Streak master, Sharpshooter, on the podium and on the winner's phone

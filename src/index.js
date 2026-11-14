@@ -321,7 +321,7 @@ export class GameRoom extends DurableObject {
     p.answers[this.qIndex] = { choice, elapsed };
     this.toPlayer(p, { t: "answer_ack", choice });
     const answered = [...this.players.values()].filter((x) => x.answers[this.qIndex]).length;
-    this.toHosts({ t: "answer_count", answered, players: this.players.size });
+    this.toHosts({ t: "answer_count", answered, players: this.players.size, who: { name: p.name, avatar: p.avatar } });
     if (answered >= this.players.size) { clearTimeout(this.timer); this.timer = setTimeout(() => this.reveal(), 600); }
   }
 

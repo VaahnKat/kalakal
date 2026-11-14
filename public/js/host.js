@@ -5,6 +5,8 @@ import { parseQuick, parseSpreadsheetFile, toCSV, TEMPLATE_CSV, aiPrompt, mediaF
 import { compressImage, ytThumb, mediaHtml, parseTime, fmtTime } from "/js/media.js";
 import { initAi, openAi } from "/js/ai-ui.js";
 import { me, api, signIn, mountNav } from "/js/account.js";
+import { sfx, jingle, mountMute } from "/js/sound.js";
+mountMute();
 
 const params = new URLSearchParams(location.search);
 let pin = (params.get("pin") || "").replace(/\D/g, "");
@@ -653,9 +655,9 @@ function onMessage(m) {
     case "update_error":
       $("#playCustom").disabled = false; $("#editErr").textContent = m.message; $("#editErr").hidden = false;
       break;
-    case "lobby": players = m.players; locked = m.locked; funNamesOn = !!m.funNames; renderLobby(); if (engage) setCount(); break;
+    case "lobby": if (m.players.length > players.length) sfx("join"); players = m.players; locked = m.locked; funNamesOn = !!m.funNames; renderLobby(); if (engage) setCount(); break;
     case "question": engage = null; question(m); break;
-    case "answer_count": $("#answered").textContent = `${m.answered} of ${m.players} answered`; break;
+    case "answer_count": $("#answered").textContent = `${m.answered} of ${m.players} answered`; if (m.who) whoAnswered(m.who); break;
     case "reveal": reveal(m); break;
     case "leaderboard": board(m); break;
     case "engage": engageStart(m); break;
@@ -684,7 +686,7 @@ $("#chips").addEventListener("click", (e) => {
 });
 $("#lockBtn").addEventListener("click", () => conn.send({ t: "lock", locked: !locked }));
 $("#funBtn").addEventListener("click", () => conn.send({ t: "fun_names", on: !funNamesOn }));
-$("#startBtn").addEventListener("click", () => conn.send({ t: "start" }));
+$("#startBtn").addEventListener("click", () => { sfx("start"); conn.send({ t: "start" }); });
 $("#skipBtn").addEventListener("click", () => conn.send({ t: "skip" }));
 $("#toBoard").addEventListener("click", () => conn.send({ t: "next" }));
 $("#nextBtn").addEventListener("click", () => conn.send({ t: "next" }));
@@ -697,6 +699,21 @@ function answerTiles(answers) {
   return answers.map((a, i) => `<div class="answer a${i}">${SHAPES[i]}<span>${esc(a)}</span></div>`).join("");
 }
 
+let beeps = [], whoCount = 0;
+function stopBeeps() { beeps.forEach(clearTimeout); beeps = []; }
+// A player locked in an answer: their character pops onto the screen with their own jingle
+function whoAnswered(who) {
+  jingle(`${who.name}#${who.avatar}`, { vol: 0.22 });
+  const row = $("#whoRow"); whoCount++;
+  if (whoCount <= 16) {
+    const el = document.createElement("span"); el.className = "who"; el.title = who.name;
+    el.innerHTML = avatarSvg(who.avatar, { size: 48, mood: "happy", label: who.name });
+    row.appendChild(el);
+  } else {
+    let more = row.querySelector(".who-more"); if (!more) { more = document.createElement("span"); more.className = "who-more"; row.appendChild(more); }
+    more.textContent = `+${whoCount - 16}`;
+  }
+}
 function question(m) {
   $("#qNum").textContent = `Question ${m.index + 1} of ${m.total}`;
   $("#qTitle").textContent = m.text;
@@ -708,6 +725,12 @@ function question(m) {
   $("#qX2").hidden = !(m.points === 2 || m.points === 0); $("#qX2").textContent = m.points === 2 ? "Double points" : "No points: warm-up";
   stopTimer && stopTimer();
   stopTimer = startTimer($("#timer"), m.time * 1000, m.remaining, null);
+  $("#whoRow").innerHTML = ""; whoCount = 0;
+  if (m.remaining > m.time * 1000 - 800) sfx("question");
+  // Countdown: a beep for each of the last five seconds, climbing in pitch, then "time's up"
+  stopBeeps(); $("#timer").classList.remove("hot");
+  for (let n = 5; n >= 1; n--) if (m.remaining > n * 1000) beeps.push(setTimeout(() => { sfx("countdown", n); $("#timer").classList.add("hot"); }, m.remaining - n * 1000));
+  beeps.push(setTimeout(() => sfx("timeup"), m.remaining));
   clearTimeout(question.hurry);
   question.hurry = setTimeout(() => { $("#qMinni").innerHTML = M("host-surprised", media ? 96 : 130, "Hurry!"); }, Math.max(0, m.remaining - 5000));
   show("question");
@@ -724,6 +747,7 @@ function barsHtml(answers, counts, highlight) {
 }
 
 function reveal(m) {
+  stopBeeps(); $("#timer").classList.remove("hot"); sfx("reveal");
   stopTimer && stopTimer(); clearTimeout(question.hurry); $("#qMedia").innerHTML = "";
   $("#rNum").textContent = `Question ${m.index + 1}`;
   $("#rTitle").textContent = m.text;
@@ -735,6 +759,7 @@ function reveal(m) {
 }
 
 function board(m) {
+  sfx("board");
   $("#bNum").textContent = `After slide ${m.index + 1} of ${m.total}`;
   $("#board").innerHTML = m.top.length ? m.top.map((p, i) => `
     <div class="lb-row rise" style="animation-delay:${i * 80}ms">
@@ -763,6 +788,7 @@ function toasts(list) {
 }
 
 function podium(m) {
+  setTimeout(() => sfx("fanfare"), 1200);
   $("#toasts").innerHTML = "";
   lastResults = m.results || [];
   const order = [1, 0, 2], heights = ["220px", "160px", "120px"], colors = ["#FFB627", "#19D3C5", "#FF5D73"];

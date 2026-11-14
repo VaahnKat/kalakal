@@ -1,5 +1,7 @@
 import { SHAPES, minni, esc, $, show, connect, ordinal, confetti } from "/js/common.js";
+import { sfx, jingle, mountMute } from "/js/sound.js";
 import { avatarSvg, randomAvatar, describeAvatar } from "/js/avatar.js";
+mountMute();
 import { funName, funNames } from "/js/names.js";
 
 const params = new URLSearchParams(location.search);
@@ -139,6 +141,7 @@ function question(m) {
   $("#pAnswers").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
     const choice = Number(b.dataset.i);
     navigator.vibrate && navigator.vibrate(20);
+    jingle(`${me && me.name}#${myAvatar}`);
     conn.send({ t: "answer", q: currentQ, choice });
     locked(choice);
   }, { once: true }));
@@ -188,6 +191,7 @@ function result(m) {
     <p style="font-weight:800;font-size:20px">${ordinal(m.rank)} of ${m.players}${move} · ${m.score} pts</p>
     ${chase}`;
   navigator.vibrate && navigator.vibrate(ms.length ? [40, 50, 40, 50, 80] : m.correct ? [30, 40, 30] : 120);
+  sfx(!m.correct ? (m.answered ? "wrong" : "timeup") : ms.length ? "milestone" : "correct");
   if (ms.includes("lead") || ms.some((k) => k.startsWith("streak5") || k.startsWith("streak7"))) confetti(60);
   show("result");
 }
@@ -212,6 +216,7 @@ function final(m) {
     <div id="rematch"></div>
     <a class="btn btn-ghost btn-block" href="/library.html">Find a quiz to host yourself</a>`;
   if (podium || m.perfect || m.award) confetti(110);
+  sfx(podium || m.award ? "fanfare" : "board");
   localStorage.removeItem("kalakal:" + pin);
   show("final");
 }

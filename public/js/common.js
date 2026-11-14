@@ -1,7 +1,10 @@
 // One address for everyone: send visitors from the old workers.dev address (and www.) to kalakal.se.
 // A host page with a running game (host.html?pin=…) stays put, because its host key lives in this browser.
+// Switch on (FORWARD = true) only after kalakal.se shows Kalakal (Cloudflare → Worker → Domains).
 const MAIN_HOST = "kalakal.se";
+const FORWARD = false;
 (() => {
+  if (!FORWARD) return;
   const h = location.hostname;
   if (h === MAIN_HOST || h === "localhost" || h === "127.0.0.1") return;
   if (!(h.endsWith(".workers.dev") || h === "www." + MAIN_HOST)) return;

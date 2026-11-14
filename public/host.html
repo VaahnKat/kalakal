@@ -336,6 +336,11 @@
     .studio-foot-in { min-height: 72px; }
     .slide-nav .muted { font-size: 14px; }
   }
+  .awards { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+  .award { display: flex; align-items: center; gap: 12px; background: var(--night); border: 2px solid var(--line); border-radius: 18px; padding: 10px 18px 10px 12px; }
+  .aw-k { font-size: 13px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--marigold); }
+  .aw-n { font-weight: 800; font-size: 20px; line-height: 1.1; }
+  .aw-d { font-size: 15px; color: var(--soft); }
 </style>
 </head>
 <body>
@@ -596,7 +601,8 @@
   <div class="wrap stage">
     <div style="padding-top: 18px; display: flex; align-items: center; justify-content: center; gap: 32px"><img class="mascot pop-in" src="/img/mascots/champion.webp" alt="Kalakal champion mascot" width="140" height="125"><div class="stack" style="gap: 4px; text-align: center"><p class="eyebrow">Final results</p><h1 style="font-size: clamp(36px, 5vw, 60px)">Kalakal!</h1></div></div>
     <div class="podium" id="podium"></div>
-    <div class="footer-bar"><button class="btn btn-ghost btn-sm" type="button" id="csvBtn">Download results (CSV)</button><a class="btn btn-primary" href="/host.html">New game</a></div>
+    <div class="awards" id="awards"></div>
+    <div class="footer-bar"><button class="btn btn-ghost btn-sm" type="button" id="csvBtn">Download results (CSV)</button><div class="row"><a class="btn btn-ghost" href="/host.html">New game</a><button class="btn btn-primary" type="button" id="againBtn" hidden>Play again</button></div></div>
   </div>
 </section>
 

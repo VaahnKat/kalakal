@@ -772,9 +772,24 @@ function podium(m) {
       <p class="who">${esc(m.top[i].name)}</p><p style="font-family:var(--display);font-weight:800;font-size:22px">${m.top[i].score}</p>
       <div class="block" style="height:${heights[i]};background:${colors[i]}">${i + 1}</div>
     </div>`).join("");
+  const AW = { fastest: "Fastest fingers", streak: "Streak master", sharp: "Sharpshooter" };
+  $("#awards").innerHTML = (m.awards || []).map((a, i) => `
+    <div class="award rise" style="animation-delay:${2000 + i * 350}ms"><span class="avw">${avatarSvg(a.avatar, { size: 56, mood: "happy", label: a.name })}</span>
+      <div><p class="aw-k">${AW[a.kind] || ""}</p><p class="aw-n">${esc(a.name)}</p><p class="aw-d">${esc(a.detail)}</p></div></div>`).join("");
+  $("#againBtn").hidden = !currentQuiz;
   show("podium");
   setTimeout(() => confetti(160), 1300);
 }
+// Same quiz, new PIN: players get a "Play again" button on their phones
+$("#againBtn").addEventListener("click", async () => {
+  const btn = $("#againBtn"); btn.disabled = true;
+  const old = conn, res = await fetch("/api/games", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ quiz: currentQuiz }) }).then((r) => r.json()).catch(() => null);
+  if (!res || !res.pin) { btn.disabled = false; return; }
+  old.send({ t: "rematch", pin: res.pin });
+  localStorage.setItem("kalakal:host:" + res.pin, res.hostKey);
+  try { sessionStorage.setItem("kalakal:media:" + res.pin, JSON.stringify(mediaList)); } catch { /* too big */ }
+  setTimeout(() => { location.href = "/host.html?pin=" + res.pin; }, 400);
+});
 
 function finished(m) {
   $("#finText").textContent = `${m.players} ${m.players === 1 ? "person" : "people"} took part. Download the results to keep everyone's input.`;

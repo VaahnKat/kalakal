@@ -277,6 +277,9 @@ export class GameRoom extends DurableObject {
         this.broadcastLobby();
         break;
       }
+      case "rematch":    // host started a new game with the same quiz: invite everyone across
+        if (this.phase === "podium" && /^\d{6}$/.test(String(msg.pin))) this.toPlayers(() => ({ t: "rematch", pin: String(msg.pin) }));
+        break;
       case "end":
         this.showEnd();
         break;
@@ -329,6 +332,8 @@ export class GameRoom extends DurableObject {
     const q = this.slide;
     const counts = q.answers.map(() => 0);
     const prevRank = new Map(this.ranked().map((p, i) => [p.id, i + 1]));
+    const lost = new Map();   // streaks of 3+ that ended on this question
+    let fastest = null;       // quickest right answer
     for (const p of this.players.values()) {
       const a = p.answers[this.qIndex];
       if (a) counts[a.choice]++;
@@ -336,9 +341,12 @@ export class GameRoom extends DurableObject {
       if (a && q.correct.includes(a.choice)) {
         const speed = 1 - a.elapsed / (q.time * 1000) / 2;
         p.streak += 1;
-        a.points = Math.round(1000 * speed) * q.points + Math.min(500, (p.streak - 1) * 100);
+        a.bonus = Math.min(500, (p.streak - 1) * 100);
+        a.points = Math.round(1000 * speed) * q.points + a.bonus;
         p.score += a.points; p.correct++; p.best = Math.max(p.best, p.streak);
-      } else { p.streak = 0; if (a) a.points = 0; }
+        p.rightMs = (p.rightMs || 0) + a.elapsed;
+        if (!fastest || a.elapsed < fastest.elapsed) fastest = { id: p.id, elapsed: a.elapsed };
+      } else { if (p.streak >= 3) lost.set(p.id, p.streak); p.streak = 0; if (a) a.points = 0; }
     }
     this.quizDone++;
     const ranked = this.ranked();
@@ -347,6 +355,7 @@ export class GameRoom extends DurableObject {
     ranked.forEach((p, idx) => {
       const rank = idx + 1, before = prevRank.get(p.id) || rank, list = [];
       const a = p.answers[this.qIndex], right = q.points !== 0 && !!a && q.correct.includes(a.choice);
+      if (right && fastest && fastest.id === p.id && this.players.size >= 3) list.push("fastest");
       if (right && (p.streak === 3 || p.streak === 5 || p.streak === 7 || (p.streak >= 10 && p.streak % 5 === 0))) list.push(`streak${p.streak}`);
       if (this.quizDone > 1 && p.score > 0) {
         if (rank === 1 && before !== 1 && ranked.length > 1) list.push("lead");
@@ -355,13 +364,16 @@ export class GameRoom extends DurableObject {
       }
       ms.set(p.id, list);
     });
-    const order = (k) => (k === "lead" ? 0 : k.startsWith("streak") ? 1 : k === "top3" ? 2 : 3);
-    this.highlights = ranked.flatMap((p) => (ms.get(p.id) || []).map((kind) => ({ name: p.name, avatar: p.avatar, kind, streak: p.streak })))
+    const order = (k) => (k === "lead" ? 0 : k.startsWith("streak") ? 1 : k === "top3" ? 2 : k === "comeback" ? 3 : 4);
+    this.highlights = ranked.flatMap((p) => (ms.get(p.id) || []).filter((k) => k !== "fastest").map((kind) => ({ name: p.name, avatar: p.avatar, kind, streak: p.streak })))
       .sort((x, y) => order(x.kind) - order(y.kind)).slice(0, 3);
     this.toHosts({ t: "reveal", index: this.qIndex, correct: q.correct, counts, text: q.text, answers: q.answers, last: this.qIndex + 1 >= this.slides.length });
     ranked.forEach((p, idx) => {
       const a = p.answers[this.qIndex];
-      this.toPlayer(p, { t: "result", answered: !!a, correct: !!a && q.correct.includes(a.choice), noPoints: q.points === 0, points: a ? a.points : 0, score: p.score, streak: p.streak, rank: idx + 1, players: ranked.length, correctText: q.correct.map((c) => q.answers[c]).join(" / "), milestones: (ms.get(p.id) || []).sort((x, y) => order(x) - order(y)) });
+      // Who to chase: the player just ahead (or, for the leader, how big the lead is)
+      const ahead = ranked[idx - 1], behind = ranked[idx + 1];
+      const chase = ahead ? { name: ahead.name, gap: ahead.score - p.score } : behind ? { lead: p.score - behind.score } : null;
+      this.toPlayer(p, { t: "result", answered: !!a, correct: !!a && q.correct.includes(a.choice), noPoints: q.points === 0, points: a ? a.points : 0, bonus: (a && a.bonus) || 0, secs: a ? Math.round(a.elapsed / 100) / 10 : null, score: p.score, streak: p.streak, lostStreak: lost.get(p.id) || 0, rank: idx + 1, move: (prevRank.get(p.id) || idx + 1) - (idx + 1), chase, players: ranked.length, correctText: q.correct.map((c) => q.answers[c]).join(" / "), milestones: (ms.get(p.id) || []).sort((x, y) => order(x) - order(y)) });
     });
   }
 
@@ -388,9 +400,25 @@ export class GameRoom extends DurableObject {
     }
     this.phase = "podium";
     const ranked = this.ranked();
-    this.toHosts({ t: "podium", top: ranked.slice(0, 3).map((p) => ({ name: p.name, score: p.score, color: p.color, avatar: p.avatar })), players: ranked.length, results: ranked.map((p, i) => ({ rank: i + 1, name: p.name, score: p.score })), summary });
     const quizCount = this.slides.filter((x) => x.type === "quiz" && x.points !== 0).length;
-    ranked.forEach((p, idx) => this.toPlayer(p, { t: "final", rank: idx + 1, score: p.score, players: ranked.length, perfect: quizCount > 1 && p.correct === quizCount, best: p.best }));
+    const awards = this.awards(ranked, quizCount);
+    this.toHosts({ t: "podium", top: ranked.slice(0, 3).map((p) => ({ name: p.name, score: p.score, color: p.color, avatar: p.avatar })), awards: awards.map(({ id, ...a }) => a), players: ranked.length, results: ranked.map((p, i) => ({ rank: i + 1, name: p.name, score: p.score })), summary });
+    ranked.forEach((p, idx) => this.toPlayer(p, { t: "final", rank: idx + 1, score: p.score, players: ranked.length, perfect: quizCount > 1 && p.correct === quizCount, best: p.best, correct: p.correct, total: quizCount, avgSecs: p.correct ? Math.round(p.rightMs / p.correct / 100) / 10 : null, award: (awards.find((a) => a.id === p.id) || {}).kind || null }));
+  }
+
+  // Extra prizes so more than three people win something. One award per player; needs 4+ players.
+  awards(ranked, quizCount) {
+    if (ranked.length < 4 || quizCount < 3) return [];
+    const out = [], taken = new Set();
+    const give = (kind, list, detail) => {
+      const p = list.find((x) => !taken.has(x.id));
+      if (p) { taken.add(p.id); out.push({ kind, id: p.id, name: p.name, avatar: p.avatar, detail: detail(p) }); }
+    };
+    const avg = (p) => p.rightMs / p.correct;
+    give("fastest", ranked.filter((p) => p.correct >= Math.ceil(quizCount / 2)).sort((a, b) => avg(a) - avg(b)), (p) => `${(avg(p) / 1000).toFixed(1)} s on average`);
+    give("streak", ranked.filter((p) => p.best >= 3).sort((a, b) => b.best - a.best), (p) => `${p.best} right in a row`);
+    give("sharp", ranked.filter((p) => p.correct >= 2).sort((a, b) => b.correct - a.correct || avg(a) - avg(b)), (p) => `${p.correct} of ${quizCount} right`);
+    return out;
   }
 
   ranked() {

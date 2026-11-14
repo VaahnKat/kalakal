@@ -109,6 +109,7 @@ function onMessage(m) {
     case "answer_ack": locked(m.choice); break;
     case "result": result(m); break;
     case "final": final(m); break;
+    case "rematch": rematch(m); break;
     case "engage": engageStart(m); break;
     case "respond_ack": engageAck(m); break;
     case "respond_error": engageNote(m.message, true); break;
@@ -154,7 +155,7 @@ function locked(choice) {
 }
 
 const MILESTONE_TEXT = {
-  lead: "You took the lead!", top3: "You're in the top 3!", comeback: "What a comeback!",
+  fastest: "Fastest right answer!", lead: "You took the lead!", top3: "You're in the top 3!", comeback: "What a comeback!",
   streak3: "On fire! 3 in a row", streak5: "Unstoppable! 5 in a row", streak7: "Legendary! 7 in a row",
 };
 function milestoneText(k) { return MILESTONE_TEXT[k] || (k.startsWith("streak") ? `Streak ×${k.slice(6)}!` : ""); }
@@ -168,33 +169,57 @@ function result(m) {
   const react = !m.correct ? (m.answered ? "wobble" : "idle") : top === "lead" ? "spin" : top && top.startsWith("streak") ? "fire" : top ? "dance" : "bounce";
   const mood = !m.correct ? (m.answered ? "sad" : "hurry") : top && top.startsWith("streak") ? "fire" : "happy";
   const streak = m.correct && m.streak > 1 && !(top && top.startsWith("streak")) ? `<p style="font-weight:800;font-size:20px">Streak ×${m.streak}</p>` : "";
+  // Where the points came from, and something to aim for next
+  const parts = m.correct && !m.noPoints ? `<p class="r-sub">${m.secs != null ? `Answered in ${m.secs} s` : ""}${m.bonus ? ` · streak bonus +${m.bonus}` : ""}</p>` : "";
+  const lost = m.lostStreak ? `<p class="r-sub">Your streak of ${m.lostStreak} ended. Start a new one!</p>` : "";
+  const c = m.chase;
+  const chase = !c || !m.score ? "" : c.lead != null
+    ? `<p class="r-chase">You lead by ${c.lead} pts. Stay fast!</p>`
+    : c.gap === 0 ? `<p class="r-chase">Level with ${esc(c.name)}!</p>`
+    : `<p class="r-chase">${c.gap <= 600 ? "Only " : ""}${c.gap} pts behind ${esc(c.name)}${c.gap <= 1000 ? ". One fast answer does it!" : ""}</p>`;
+  const move = m.move > 0 ? ` <span class="r-up">▲ ${m.move}</span>` : "";
   el.innerHTML = `
     <div class="avw react-${react}">${avatarSvg(myAvatar, { size: 160, mood, label: "Your character" })}</div>
     <p class="big">${m.correct ? "Kalakal!" : m.answered ? "Not this time" : "Time's up"}</p>
     ${m.correct && m.noPoints ? `<p style="font-weight:700;font-size:19px">Warm-up round: no points</p>` : m.correct ? `<p class="big" style="font-size:34px">+${m.points}</p>` : `<p style="font-weight:700;font-size:19px">Answer: ${esc(m.correctText)}</p>`}
-    ${ms.map((k) => `<p class="milestone">${esc(milestoneText(k))}</p>`).join("")}
+    ${parts}${lost}
+    ${ms.slice(0, 2).map((k) => `<p class="milestone">${esc(milestoneText(k))}</p>`).join("")}
     ${streak}
-    <p style="font-weight:800;font-size:20px">You're ${ordinal(m.rank)} of ${m.players} · ${m.score} pts</p>`;
+    <p style="font-weight:800;font-size:20px">${ordinal(m.rank)} of ${m.players}${move} · ${m.score} pts</p>
+    ${chase}`;
   navigator.vibrate && navigator.vibrate(ms.length ? [40, 50, 40, 50, 80] : m.correct ? [30, 40, 30] : 120);
   if (ms.includes("lead") || ms.some((k) => k.startsWith("streak5") || k.startsWith("streak7"))) confetti(60);
   show("result");
 }
 
+const AWARDS = { fastest: "Fastest fingers award", streak: "Streak master award", sharp: "Sharpshooter award" };
 function final(m) {
   const podium = m.rank <= 3;
   const title = m.rank === 1 ? "Champion!" : `${ordinal(m.rank)} place`;
+  const stats = m.total ? `<div class="f-stats">
+      <div><strong>${m.correct}/${m.total}</strong><span>right</span></div>
+      <div><strong>${m.best || 0}</strong><span>best streak</span></div>
+      <div><strong>${m.avgSecs != null ? m.avgSecs + " s" : "–"}</strong><span>avg. speed</span></div></div>` : "";
   $("#final").innerHTML = `
-    <div class="avw ${podium ? "react-dance react-glow" : "react-bounce"}">${avatarSvg(myAvatar, { size: 170, mood: podium ? "happy" : "wink", label: "Your character" })}</div>
+    <div class="avw ${podium || m.award ? "react-dance react-glow" : "react-bounce"}">${avatarSvg(myAvatar, { size: 150, mood: podium || m.award ? "happy" : "wink", label: "Your character" })}</div>
     <p class="eyebrow">Final result</p>
     <h1 style="font-size: 40px">${title}</h1>
     <p style="font-family: var(--display); font-weight: 800; font-size: 28px; color: var(--marigold)">${m.score} points</p>
+    ${m.award ? `<p class="milestone">${AWARDS[m.award]}</p>` : ""}
     ${m.perfect ? '<p class="milestone">Perfect game! Every answer right</p>' : ""}
-    ${m.best >= 3 ? `<p class="muted">Best streak: ${m.best} in a row</p>` : ""}
+    ${stats}
     <p class="muted">${podium ? "You made the podium. Kalakal!" : `Out of ${m.players} players. Great game!`}</p>
-    <a class="btn btn-ghost" href="/host.html">Host your own game, free</a>`;
-  if (podium || m.perfect) confetti(110);
+    <div id="rematch"></div>
+    <a class="btn btn-ghost btn-block" href="/library.html">Find a quiz to host yourself</a>`;
+  if (podium || m.perfect || m.award) confetti(110);
   localStorage.removeItem("kalakal:" + pin);
   show("final");
+}
+// The host started the same quiz again: one tap to join the new game
+function rematch(m) {
+  const box = $("#rematch"); if (!box) return;
+  box.innerHTML = `<a class="btn btn-primary btn-block react-bounce" href="/play.html?pin=${encodeURIComponent(m.pin)}">Play again! Join the rematch</a>`;
+  navigator.vibrate && navigator.vibrate([40, 60, 40]);
 }
 
 function message(title, text, mood) {

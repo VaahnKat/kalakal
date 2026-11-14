@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9 — 14 Nov 2026
+- **Player motivation:** result screen shows answer time, streak bonus, places gained and who to chase (or your lead); a lost streak is acknowledged; "Fastest right answer" each question
+- **Awards** for games with 4+ players: Fastest fingers, Streak master, Sharpshooter, on the podium and on the winner's phone
+- **Final screen:** right answers, best streak, average speed; link to the library
+- **Play again** on the podium: same quiz, new PIN, phones get a Join the rematch button
+- Product audit and backlog: `docs/AUDIT-2026-11-14.md`
+
 ## 0.8 — 14 Nov 2026
 - **New quiz builder in three steps:** Questions → Details → Save & play, with a step bar at the top and Back / Next at the bottom
 - **Start screen** for a new quiz: Create with AI, From a web link, Type or paste, From a spreadsheet, Start from scratch (or open a ready-made example)

@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /me.html
+Disallow: /api/
+Disallow: /auth/
+
+Sitemap: https://kalakal.se/sitemap.xml

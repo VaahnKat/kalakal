@@ -1,3 +1,14 @@
+// One address for everyone: send visitors from the old workers.dev address (and www.) to kalakal.se.
+// A host page with a running game (host.html?pin=…) stays put, because its host key lives in this browser.
+const MAIN_HOST = "kalakal.se";
+(() => {
+  const h = location.hostname;
+  if (h === MAIN_HOST || h === "localhost" || h === "127.0.0.1") return;
+  if (!(h.endsWith(".workers.dev") || h === "www." + MAIN_HOST)) return;
+  if (location.pathname === "/host.html" && new URLSearchParams(location.search).get("pin")) return;
+  location.replace(`https://${MAIN_HOST}${location.pathname}${location.search}${location.hash}`);
+})();
+
 // Shared helpers for Kalakal pages.
 
 export const SHAPES = [

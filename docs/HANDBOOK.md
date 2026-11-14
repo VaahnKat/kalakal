@@ -3,7 +3,7 @@
 The one document that explains what Kalakal is, how it is built, and how to change it.
 Version 0.7 · November 2026 · Owner: Prabha
 
-**Live site:** https://kalakal.se (once connected, see section 7) · https://kalakal.prabhuwinz17.workers.dev
+**Live site:** https://kalakal.se (the old address kalakal.prabhuwinz17.workers.dev forwards visitors here)
 **Code:** https://github.com/VaahnKat/kalakal (branch `main` deploys automatically)
 **Files and originals:** Google Drive → `Kalakal`
 
@@ -378,7 +378,7 @@ Manual deploy (if ever needed): `npx wrangler login` then `npm run deploy`.
 3. Workers & Pages → **kalakal** → Settings → **Domains & Routes** → Add → **Custom domain** → `kalakal.se`. Repeat for `www.kalakal.se`. Cloudflare creates the DNS records and the HTTPS certificate.
 4. Optional: Rules → Redirect Rules → send `www.kalakal.se/*` to `https://kalakal.se/${1}` so there is one address.
 
-The app uses whatever address it is opened on, so the lobby automatically shows "Join at kalakal.se". The workers.dev address keeps working.
+**Status: live since 14 Nov 2026.** The app uses whatever address it is opened on, so the lobby shows "Join at kalakal.se". Pages opened on the old workers.dev address or on www.kalakal.se forward to kalakal.se (`MAIN_HOST` at the top of `public/js/common.js`); a host page with a running game is left alone. `public/robots.txt` and `public/sitemap.xml` help search engines; add new public pages to the sitemap.
 
 ### Roll back
 

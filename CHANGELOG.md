@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.7.1 — 14 Nov 2026
+- kalakal.se is the main address: workers.dev and www forward to it; robots.txt and sitemap.xml
+
 ## 0.7 — 14 Nov 2026
 - **Accounts:** Sign in with Google; welcome step (display name, 13+, terms); My quizzes (host, edit, page, duplicate, delete); download my data; delete account
 - **Save & share** in the editor: description, category, language, age group; Private / Unlisted / Public; Save to My quizzes; open saved quizzes for editing

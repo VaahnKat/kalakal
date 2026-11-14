@@ -2,7 +2,7 @@
 
 Live quizzes and audience interaction anyone can join with a PIN. Host on a big screen, play on phones. No app, no account.
 
-**Live:** https://kalakal.prabhuwinz17.workers.dev · **Version:** 0.7 · **Full documentation:** [docs/HANDBOOK.md](docs/HANDBOOK.md)
+**Live:** https://kalakal.se · **Version:** 0.7 · **Full documentation:** [docs/HANDBOOK.md](docs/HANDBOOK.md)
 
 | Mode | Like | What players do |
 |---|---|---|

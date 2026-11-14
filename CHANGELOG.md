@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8 — 14 Nov 2026
+- **New quiz builder in three steps:** Questions → Details → Save & play, with a step bar at the top and Back / Next at the bottom
+- **Start screen** for a new quiz: Create with AI, From a web link, Type or paste, From a spreadsheet, Start from scratch (or open a ready-made example)
+- **One question at a time:** question list on the left (green = ready, red = needs work), Previous / Next, move up/down, delete asks first; on phones the list becomes a row of numbers
+- **Create from a web link:** paste an article or Wikipedia link; the AI only asks about what's on the page and the page title becomes the quiz title. The AI window now has three sources: A topic, A web link, My notes or PDF
+- **Clearer sign-in:** a highlighted "Sign in to save your quiz" banner while building, a Google sign-in button in the header, and a Save card on the last step that explains what signing in gives you
+- Guide page: new Way 5 (From a web link), steps and FAQ updated for the new builder, all six GIFs re-recorded; privacy policy mentions link reading
+
 ## 0.7.1 — 14 Nov 2026
 - kalakal.se is the main address: workers.dev and www forward to it; robots.txt and sitemap.xml
 

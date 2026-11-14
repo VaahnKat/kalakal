@@ -42,8 +42,20 @@ const bad = await post("/api/ai/tweak", { topic: "Sweden", action: "new", slide:
 if (bad.status !== 400) fail("incomplete question accepted");
 ok("rejects an incomplete question");
 
+// Create from a web link (the fake AI reads one of our own pages)
+await post("/api/ai/reset", {});
+const lk = await post("/api/ai/quiz", { url: BASE + "/privacy", count: 5 });
+if (lk.status !== 200 || lk.slides.length !== 5 || !lk.page || !/Privacy/.test(lk.page.title) || lk.quizzes !== 4) fail("from a link " + JSON.stringify(lk).slice(0, 300));
+ok("from a web link: reads the page, uses its title, counts one quiz");
+for (const [url, why] of [["not a link", "web address"], ["https://www.youtube.com/watch?v=x", "Videos"], ["ftp://example.com/a", "https://"]]) {
+  const r = await post("/api/ai/quiz", { url, count: 5 });
+  if (r.status !== 400 || !r.error.includes(why) || r.quizzes !== 4) fail(`bad link ${url} ` + JSON.stringify(r));
+}
+ok("bad links are refused with a clear reason and don't use up a quiz");
+await post("/api/ai/reset", {});
+
 let last;
-for (let i = 0; i < 5; i++) last = await post("/api/ai/quiz", { topic: "Space", count: 5 });
+for (let i = 0; i < 6; i++) last = await post("/api/ai/quiz", { topic: "Space", count: 5 });
 if (last.status !== 429 || !last.limit || last.quizzes !== 0) fail("daily limit " + JSON.stringify(last));
 ok("6th quiz of the day is refused with a friendly message: " + last.error.slice(0, 60) + "…");
 await post("/api/ai/reset", {});

@@ -57,6 +57,7 @@ class Rec:
         await self.page.evaluate("""() => { const host = document.querySelector('dialog[open]') || document.body;
             for (const id of ['kk-cur', 'kk-ring', 'kk-cap', 'kk-ai']) { const el = document.getElementById(id); if (el && el.parentNode !== host) host.appendChild(el); } }""")
         await self.page.evaluate("""() => { const h = document.getElementById('joinHost'); if (h) h.textContent = 'kalakal.se';
+            const sl = document.getElementById('shareLink'); if (sl) sl.textContent = sl.textContent.replace(new RegExp('^https?://[^/]+'), 'https://kalakal.se');
             const e = document.getElementById('eJoin'); if (e) e.textContent = e.textContent.replace(/Join at \\S+/, 'Join at kalakal.se'); }""")
 
     async def shot(self, ms=120):
@@ -156,33 +157,38 @@ The Thirukkural has 1330 couplets.
 
 async def rec_paste(ctx):
     page = await builder(ctx); r = Rec(page)
-    await r.ready(); await page.fill("#quizTitle", "Friday fun quiz")
-    await r.caption("1 · Press “Paste or type questions”", 1100)
-    await r.click("#openPaste", 700)
+    await r.ready()
+    await r.caption("1 · Choose “Type or paste”", 1100)
+    await r.click('[data-start="paste"]', 700)
     await r.caption("2 · Type or paste. * marks the right answer", 900)
     await r.type("#pasteText", PASTE_TEXT, chunk=9)
     await r.caption("3 · Check the preview, then Add to quiz", 1200)
     await r.click("#pasteAdd", 600)
-    await page.evaluate("window.scrollTo(0, 260)")
-    await r.caption("Done: 3 questions ready to edit or play", 2600)
+    await r.caption("Done: 3 questions, listed on the left, ready to edit or play", 2600)
     r.save("paste", poster_index=None)
 
 
 async def rec_editor(ctx):
     page = await builder(ctx); r = Rec(page)
-    await r.ready(); await page.evaluate("window.scrollTo(0, 240)")
-    await r.caption("1 · Type the question, press Enter", 1000)
+    await r.ready()
+    await r.caption("1 · Choose “Start from scratch”", 1000)
+    await r.click('[data-start="blank"]', 500)
+    await r.caption("2 · Type the question, press Enter", 1000)
     await r.type('[data-q="0"] [data-f="text"]', "Which festival is in January?", chunk=6, enter=True)
-    await r.caption("2 · Type the answers, Enter after each", 900)
+    await r.caption("3 · Type the answers, Enter after each", 900)
     for i, a in enumerate(["Diwali", "Pongal", "Onam", "Holi"]):
         await r.type(f'[data-q="0"] [data-f="ans"][data-a="{i}"]', a, chunk=4)
-    await r.caption("3 · Tap Right on the correct answer", 1000)
+    await r.caption("4 · Tap Right on the correct answer", 1000)
     await r.click('[data-q="0"] [data-f="mark"][data-a="1"]', 400)
     await r.click('[data-q="0"] [data-f="mark"][data-a="0"]', 600)
-    await r.caption("4 · Pick time and points (Double for a bonus round)", 1100)
+    await r.caption("5 · Pick time and points (Double for a bonus round)", 1100)
     await r.move('[data-q="0"] [data-f="points"]')
     await page.select_option('[data-q="0"] [data-f="points"]', "2"); await r.shot(700)
-    await r.caption("5 · Create game: your PIN appears on the big screen", 1100)
+    await r.caption("6 · Next: give it a title", 900)
+    await r.click("#stepNext", 500)
+    await r.type("#quizTitle", "Festival quiz", chunk=4)
+    await r.click("#stepNext", 600)
+    await r.caption("7 · Create game: your PIN appears on the big screen", 1100)
     await r.click("#playCustom", 1400)
     await r.caption("", 2400)
     r.save("editor")
@@ -217,24 +223,23 @@ async def rec_sheet(ctx):
     await r.move("#t tr:nth-child(5) td:last-child")
     await r.caption("2 · Select the rows and copy (Ctrl/Cmd + C)", 1500)
     page = await builder(ctx); r.page = page; await r.ready()
-    await r.caption("3 · In Kalakal, open Paste and paste the rows", 1000)
-    await r.click("#openPaste", 600)
+    await r.caption("3 · In Kalakal, choose Type or paste and paste the rows", 1000)
+    await r.click('[data-start="paste"]', 600)
     await page.fill("#pasteText", "\n".join("\t".join(x) for x in SHEET_ROWS))
     await page.dispatch_event("#pasteText", "input"); await r.shot(1600)
-    await r.caption("4 · Add to quiz. Or use “Import spreadsheet” for a CSV file", 1400)
+    await r.caption("4 · Add to quiz. Or choose “From a spreadsheet” for a CSV file", 1400)
     await r.click("#pasteAdd", 700)
-    await page.evaluate("window.scrollTo(0, 240)"); await r.caption("Done: 4 slides from your sheet", 2400)
+    await r.caption("Done: 4 slides from your sheet", 2400)
     r.save("spreadsheet")
 
 
 async def rec_ai(ctx):
     page = await builder(ctx); r = Rec(page); await r.ready()
     await page.evaluate("fetch('/api/ai/reset', {method: 'POST'})")
-    await page.fill("#quizTitle", "Space quiz")
-    await r.caption("1 · Press “Create with AI”", 1000)
-    await r.click("#openAi", 700)
+    await r.caption("1 · Choose “Create with AI”", 1000)
+    await r.click('[data-start="ai"]', 700)
     await page.fill("#aiTopic", "")
-    await r.caption("2 · Say what it's about (or add notes or a PDF)", 800)
+    await r.caption("2 · Say what it's about (or use a link, notes or a PDF)", 800)
     await r.type("#aiTopic", "The solar system", chunk=4)
     await r.caption("3 · Choose how many, how hard, who's playing, language", 1000)
     await r.move("#aiAudience"); await page.select_option("#aiAudience", "tweens"); await r.shot(600)
@@ -246,17 +251,43 @@ async def rec_ai(ctx):
     await r.click('[data-i="2"] input[type=checkbox]', 500)
     await r.caption("5 · Add the ones you like to your quiz", 900)
     await r.click("#aiAdd", 700)
-    await page.evaluate("window.scrollTo(0, 240)"); await r.caption("Done: edit them like any other question", 2400)
+    await r.caption("Done: edit them like any other question", 2400)
     r.save("ai")
+
+
+async def rec_link(ctx):
+    page = await builder(ctx); r = Rec(page); await r.ready()
+    await page.evaluate("fetch('/api/ai/reset', {method: 'POST'})")
+    # The local test server can't reach the internet: the request is sent to one of our own pages instead
+    async def swap(route):
+        import json
+        body = json.loads(route.request.post_data or "{}")
+        if body.get("url"): body["url"] = BASE + "/create"
+        await route.continue_(post_data=json.dumps(body))
+    await page.route("**/api/ai/quiz", swap)
+    await r.caption("1 · Choose “From a web link”", 1000)
+    await r.click('[data-start="link"]', 700)
+    await r.caption("2 · Paste the link to an article or Wikipedia page", 800)
+    await r.type("#aiUrl", "https://en.wikipedia.org/wiki/Solar_System", chunk=7)
+    await r.caption("3 · Choose how many, how hard, who's playing, language", 1000)
+    await r.move("#aiCount"); await page.select_option("#aiCount", "5"); await r.shot(600)
+    await r.click("#aiGo", 250)
+    await r.shot(900)
+    await page.wait_for_selector("#aiReview:not([hidden])"); await page.wait_for_timeout(300)
+    await r.caption("4 · The AI only asks about what's on the page. Check each answer", 1600)
+    await r.caption("5 · Add them to your quiz", 900)
+    await r.click("#aiAdd", 700)
+    await r.caption("Done: edit, add pictures, play", 2400)
+    r.save("link")
 
 
 async def rec_media(ctx, browser):
     page = await builder(ctx); r = Rec(page); await r.ready()
-    await page.fill("#quizTitle", "Guess the mascot")
+    await page.click('[data-start="blank"]'); await page.wait_for_timeout(300)
     await page.fill('[data-q="0"] [data-f="text"]', "Who is this?")
     for i, a in enumerate(["Arcade Champion", "Quiz Host", "Explorer"]):
         await page.fill(f'[data-q="0"] [data-f="ans"][data-a="{i}"]', a)
-    await page.evaluate("window.scrollTo(0, 240)")
+    await page.click('[data-q="0"] [data-f="mark"][data-a="0"]')
     await r.caption("1 · Press Add picture, or drag one onto the question", 1100)
     await r.move('[data-q="0"] [data-f="upload"]')
     async with page.expect_file_chooser() as fc:
@@ -274,6 +305,8 @@ async def rec_media(ctx, browser):
         await page.locator('[data-q="0"] [data-f="upload"]').click()
     await (await fc.value).set_files(str(PICTURE)); await page.wait_for_timeout(1000)
     await r.caption("3 · It shows on the big screen during the question", 900)
+    await page.click("#stepNext"); await page.fill("#quizTitle", "Guess the mascot")
+    await page.click("#stepNext"); await page.wait_for_timeout(300)
     await page.click("#playCustom"); await page.wait_for_timeout(1200)
     pin = page.url.split("pin=")[1]
     phone = await browser.new_page(viewport={"width": 390, "height": 844})
@@ -292,7 +325,7 @@ async def main():
         browser = await p.chromium.launch(executable_path=CHROME, args=["--no-proxy-server"])
         ctx = await browser.new_context(viewport=VIEW, device_scale_factor=1)
         await ctx.grant_permissions(["clipboard-read", "clipboard-write"], origin=BASE)
-        jobs = {"paste": rec_paste, "editor": rec_editor, "spreadsheet": rec_sheet, "ai": rec_ai}
+        jobs = {"paste": rec_paste, "editor": rec_editor, "spreadsheet": rec_sheet, "ai": rec_ai, "link": rec_link}
         for name, fn in jobs.items():
             if not only or name in only:
                 await fn(ctx)

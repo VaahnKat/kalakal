@@ -73,10 +73,6 @@
   .ai-edit-row input { flex: 1; }
   .ai-edit-row .mark { background: var(--night); border-color: var(--line); color: var(--soft); }
   .ai-edit-row .mark[aria-pressed="true"] { background: var(--teal); border-color: var(--teal); color: var(--ink); }
-  .meta-card summary { cursor: pointer; display: flex; gap: 6px 16px; align-items: center; flex-wrap: wrap; list-style: none; }
-  .meta-card summary::-webkit-details-marker { display: none; }
-  .meta-card summary::after { content: "Open"; margin-left: auto; font-weight: 800; color: var(--teal); font-size: 15px; }
-  .meta-card[open] summary::after { content: "Close"; }
   .meta-card textarea { width: 100%; background: var(--ink); color: var(--cream); border: 2px solid var(--line); border-radius: 12px; padding: 10px 12px; font: 17px var(--body); resize: vertical; }
   .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 12px; }
   .meta-grid select { width: 100%; }
@@ -92,9 +88,12 @@
   dialog.ai { width: min(920px, 94vw); }
   .ai-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr)); gap: 12px; }
   .ai-opts .field select, .ai-opts .field input { width: 100%; }
-  .ai-src { background: var(--ink); border: 1px solid var(--line); border-radius: 14px; padding: 4px 16px; }
-  .ai-src summary { cursor: pointer; font-weight: 800; padding: 12px 0; }
-  .ai-src textarea { width: 100%; min-height: 140px; background: var(--night); color: var(--cream); border: 2px solid var(--line); border-radius: 12px; padding: 12px; font: 16px/1.5 var(--body); resize: vertical; }
+  .ai-notes { min-height: 150px; font: 16px/1.5 var(--body); }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: var(--ink); border: 2px solid var(--line); border-radius: 16px; padding: 5px; }
+  .seg button { min-height: 46px; border: 0; border-radius: 11px; background: transparent; color: var(--soft); font: 800 15px var(--body); cursor: pointer; }
+  .seg button:hover { color: var(--cream); }
+  .seg button[aria-selected="true"] { background: var(--marigold); color: var(--ink); box-shadow: 0 3px 0 #C98500; }
+  .fine { font-size: 15px; }
   .ai-left { border-radius: 99px; padding: 3px 12px; font-weight: 800; font-size: 14px; background: var(--ink); border: 1px solid var(--line); color: var(--soft); }
   .ai-busy { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 40px 0; text-align: center; }
   .ai-list { display: flex; flex-direction: column; gap: 12px; max-height: 56vh; overflow: auto; padding-right: 4px; }
@@ -178,6 +177,165 @@
   .pod .block { width: 100%; border-radius: 18px 18px 0 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 16px; font-family: var(--display); font-weight: 800; font-size: 44px; color: var(--ink); }
   .pod .who { font-weight: 800; font-size: 24px; text-align: center; word-break: break-word; }
   .footer-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+  /* ---------- builder ("studio") ---------- */
+  .studio-screen { padding-bottom: 96px; }
+  .studio-top { position: sticky; top: 0; z-index: 20; background: rgba(22,11,42,.94); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .studio-bar { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 72px; }
+  .stepper { display: flex; gap: 6px; list-style: none; margin: 0; padding: 0; counter-reset: none; }
+  .stepper li { display: flex; align-items: center; }
+  .stepper li + li::before { content: ""; width: 26px; height: 3px; border-radius: 3px; background: var(--line); margin-right: 6px; }
+  .stepper li.done + li::before { background: var(--teal); }
+  .stepper button { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 6px; border-radius: 99px; border: 2px solid transparent; background: none; color: var(--mist); font: 800 15px var(--body); cursor: pointer; }
+  .stepper button:hover { color: var(--cream); }
+  .st-n { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--night); border: 2px solid var(--line); font-family: var(--display); font-size: 13px; }
+  .stepper .done .st-n { background: var(--teal); border-color: var(--teal); color: var(--ink); }
+  .stepper button[aria-current="step"] { background: var(--night); border-color: var(--marigold); color: var(--cream); }
+  .stepper button[aria-current="step"] .st-n { background: var(--marigold); border-color: var(--marigold); color: var(--ink); }
+  .studio-acct { flex-wrap: nowrap; }
+  .acct-mini { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: var(--soft); white-space: nowrap; }
+  .acct-mini img, .acct-mini .ini { width: 32px; height: 32px; border-radius: 50%; }
+  .acct-mini .ini { display: grid; place-items: center; background: var(--lilac); color: var(--ink); font-weight: 800; }
+  .studio { padding-top: 22px; display: flex; flex-direction: column; gap: 18px; }
+
+  .btn-google { background: #fff; color: #1F1F1F; border: 0; box-shadow: 0 4px 0 rgba(0,0,0,.35); font-family: var(--body); font-size: 17px; font-weight: 800; }
+  .btn-google:hover { filter: brightness(.97); color: #1F1F1F; }
+  .btn-google:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+  .g-logo { width: 22px; height: 22px; flex-shrink: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath fill='%23EA4335' d='M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z'/%3E%3Cpath fill='%234285F4' d='M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z'/%3E%3Cpath fill='%23FBBC05' d='M10.6 28.6c-.5-1.4-.8-2.9-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z'/%3E%3Cpath fill='%2334A853' d='M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.2 0-11.5-4.2-13.4-9.9l-7.9 6.1C6.6 42.6 14.6 48 24 48z'/%3E%3C/svg%3E") center / contain no-repeat; }
+  .signin-banner { display: flex; align-items: center; gap: 18px; padding: 16px 20px; border-radius: 22px; background: linear-gradient(100deg, #3B2470, #24143F 70%); border: 2px solid var(--marigold); box-shadow: 0 6px 0 rgba(255,182,39,.25); }
+  .signin-banner .mascot { width: 58px; height: auto; flex-shrink: 0; }
+  .sb-text { flex: 1; min-width: 0; }
+  .sb-title { font-family: var(--display); font-weight: 800; font-size: 20px; color: var(--marigold); }
+  .sb-sub { color: var(--soft); font-size: 16px; margin-top: 2px; }
+  .signin-banner .btn-google { flex-shrink: 0; min-height: 52px; }
+  .signin-banner.off { border-color: var(--line); box-shadow: none; background: var(--night); }
+  .signin-banner.off .sb-title { color: var(--cream); }
+
+  /* start screen */
+  .start-pane { display: flex; flex-direction: column; gap: 26px; padding: 12px 0 10px; }
+  .start-head { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+  .start-head h1 { font-size: clamp(30px, 4vw, 46px); }
+  .start-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 18px; }
+  .start-grid > .start-tile { grid-column: span 2; }
+  .start-grid > .t-ai, .start-grid > .t-link { grid-column: span 3; min-height: 170px; }
+  .start-grid > .t-ai strong, .start-grid > .t-link strong { font-size: 22px; }
+  .start-grid > .t-paste, .start-grid > .t-sheet, .start-grid > .t-blank { min-height: 150px; }
+  .start-tile { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; text-align: left; padding: 22px 20px 20px; min-height: 196px; border-radius: 24px; border: 2px solid var(--line); background: var(--night); color: var(--cream); font-family: var(--body); cursor: pointer; box-shadow: 0 6px 0 var(--line); transition: transform .1s ease, box-shadow .1s ease, border-color .15s; }
+  .start-tile:hover { border-color: var(--tile, var(--mist)); box-shadow: 0 6px 0 var(--tile, var(--mist)); }
+  .start-tile:active { transform: translateY(5px); box-shadow: 0 1px 0 var(--tile, var(--mist)); }
+  .start-tile:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+  .start-tile strong { font-family: var(--display); font-size: 19px; line-height: 1.15; margin-top: 6px; }
+  .start-tile > span:last-child { color: var(--soft); font-size: 16px; line-height: 1.35; }
+  .t-icon { width: 56px; height: 56px; border-radius: 18px; display: grid; place-items: center; background: var(--tile); color: var(--ink); font-size: 28px; font-weight: 800; box-shadow: 0 4px 0 rgba(0,0,0,.3); }
+  .t-badge { position: absolute; top: 14px; right: 14px; background: var(--tile); color: var(--ink); border-radius: 99px; padding: 2px 10px; font-weight: 800; font-size: 13px; }
+  .t-ai { --tile: var(--marigold); } .t-link { --tile: var(--teal); } .t-paste { --tile: var(--coral); } .t-sheet { --tile: var(--lilac); } .t-blank { --tile: var(--cream); }
+  .t-ai { border-color: var(--marigold); box-shadow: 0 6px 0 #C98500; background: linear-gradient(160deg, #3B2470, var(--night) 60%); }
+  .start-foot { text-align: center; font-size: 16px; }
+  .link-btn.inline { min-height: 0; padding: 0; color: var(--teal); font-size: inherit; display: inline; }
+
+  /* question editor */
+  .build { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 22px; align-items: start; }
+  .outline { position: sticky; top: 92px; display: flex; flex-direction: column; gap: 12px; background: var(--night); border-radius: 22px; padding: 16px; max-height: calc(100vh - 200px); overflow: auto; }
+  .ol-head { display: flex; align-items: center; justify-content: space-between; }
+  .ol-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .ol-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; border: 2px solid transparent; background: var(--ink); color: var(--cream); font: 700 15px/1.25 var(--body); text-align: left; cursor: pointer; min-height: 52px; }
+  .ol-item:hover { border-color: var(--line); }
+  .ol-item[aria-current="true"] { border-color: var(--marigold); background: #2E1A50; }
+  .ol-num { width: 28px; height: 28px; flex-shrink: 0; border-radius: 9px; display: grid; place-items: center; font-family: var(--display); font-size: 13px; background: var(--line); }
+  .ol-item.ok .ol-num { background: var(--teal); color: var(--ink); }
+  .ol-item.todo .ol-num { background: var(--coral); color: var(--ink); }
+  .ol-txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .ol-txt.empty { color: var(--mist); font-style: italic; font-weight: 600; }
+  .ol-pic { font-size: 13px; color: var(--mist); flex-shrink: 0; }
+  .ol-add { width: 100%; border-style: dashed; }
+  .ol-more { border-top: 1px solid var(--line); padding-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .ol-more-t { grid-column: 1 / -1; font-size: 14px; font-weight: 700; color: var(--mist); }
+  .ol-way { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 10px; border-radius: 12px; border: 2px solid var(--line); background: none; color: var(--cream); font: 700 14px var(--body); cursor: pointer; text-align: left; }
+  .ol-way:hover { border-color: var(--mist); }
+  .w-ic { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; font-size: 12px; color: var(--ink); flex-shrink: 0; }
+  .w-ic.ai { background: var(--marigold); } .w-ic.link { background: var(--teal); } .w-ic.paste { background: var(--coral); } .w-ic.sheet { background: var(--lilac); }
+  .slide-pane { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .slide-pane .q-card { border: 2px solid var(--line); animation: rise .25s ease both; }
+  .slide-pane .q-card > input[data-f="text"] { font-size: 22px; min-height: 64px; font-weight: 700; }
+  .slide-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+  /* steps 2 and 3 */
+  .step-card { max-width: 820px; margin: 0 auto; width: 100%; }
+  .step-h { font-size: clamp(26px, 3vw, 36px); margin-top: 4px; }
+  .sheet-tools { display: flex; gap: 8px 16px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--line); padding-top: 14px; font-size: 16px; }
+  .finish-head { text-align: center; display: flex; flex-direction: column; gap: 6px; align-items: center; padding: 6px 0 4px; }
+  .finish-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 20px; max-width: 980px; margin: 0 auto; width: 100%; }
+  .fc-head { display: flex; gap: 14px; align-items: flex-start; }
+  .fc-head h2 { font-size: 22px; }
+  .fc-ic { width: 48px; height: 48px; border-radius: 15px; display: grid; place-items: center; flex-shrink: 0; color: var(--ink); }
+  .fc-ic.save { background: var(--teal); } .fc-ic.play { background: var(--marigold); }
+  .finish-play { border: 2px solid var(--marigold); }
+  .ticks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .ticks li::before { content: "✓"; display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 10px; border-radius: 50%; background: var(--teal); color: var(--ink); font-weight: 800; font-size: 13px; }
+  .btn-xl { min-height: 64px; font-size: 19px; box-shadow: 0 5px 0 #C98500; }
+  .btn-xl:active { transform: translateY(4px); box-shadow: 0 1px 0 #C98500; }
+
+  .studio-foot { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: rgba(22,11,42,.96); backdrop-filter: blur(8px); border-top: 1px solid var(--line); }
+  .studio-foot-in { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 80px; }
+  .draft-note { font-size: 15px; text-align: center; flex: 1; }
+  #stepNext { box-shadow: 0 5px 0 #C98500; }
+  #stepNext:active { transform: translateY(4px); box-shadow: 0 1px 0 #C98500; }
+  .type-dlg { width: min(760px, 94vw); }
+
+  @media (max-width: 900px) {
+    .stepper .st-l { display: none; }
+    .stepper button[aria-current="step"] .st-l { display: inline; }
+    .stepper li + li::before { width: 12px; }
+    .acct-mini span { display: none; }
+    .build { grid-template-columns: 1fr; }
+    .outline { position: static; max-height: none; padding: 12px; }
+    .ol-list { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
+    .ol-list li { flex-shrink: 0; }
+    .ol-item { width: auto; min-width: 52px; justify-content: center; padding: 6px; }
+    .ol-item .ol-txt, .ol-item .ol-pic { display: none; }
+    .ol-more { grid-template-columns: repeat(4, auto); justify-content: start; overflow-x: auto; }
+    .ol-more-t { display: none; }
+    .ol-way { white-space: nowrap; }
+    .signin-banner { flex-wrap: wrap; }
+    .signin-banner .mascot { display: none; }
+    .signin-banner .btn-google { width: 100%; }
+    .draft-note { display: none; }
+  }
+  @media (max-width: 560px) {
+    .studio-bar .brand { display: none; }
+    .stepper { gap: 2px; }
+    .stepper li + li::before { width: 8px; margin-right: 2px; }
+    .st-n { width: 26px; height: 26px; }
+    .start-tile { min-height: 0; }
+  }
+
+  .sb-short { display: none; color: var(--soft); font-size: 15px; }
+  .signin-banner.slim { padding: 10px 14px 10px 18px; gap: 14px; box-shadow: none; }
+  .signin-banner.slim .mascot, .signin-banner.slim .sb-sub { display: none; }
+  .signin-banner.slim .sb-short { display: block; }
+  .signin-banner.slim .sb-title { font-size: 17px; }
+  .signin-banner.slim .btn-google { min-height: 44px; font-size: 15px; }
+  .studio-foot[hidden] { display: none !important; }
+  @media (max-width: 700px) {
+    .studio-bar { gap: 8px; min-height: 64px; }
+    .studio-acct .btn-google { display: none; }
+    .studio-acct .btn { padding: 0 12px; }
+    .stepper button { padding: 0 10px 0 4px; }
+    .sb-sub { display: none; }
+    .sb-short { display: block; }
+    .start-grid { grid-template-columns: 1fr; gap: 14px; }
+    .start-grid > .start-tile { grid-column: auto; min-height: 0; }
+    .start-grid > .t-ai strong, .start-grid > .t-link strong { font-size: 17px; }
+    .start-tile { display: grid; grid-template-columns: 56px 1fr; column-gap: 14px; row-gap: 2px; align-items: center; padding: 16px; }
+    .start-tile .t-icon { grid-row: span 2; }
+    .start-tile strong { margin: 0; font-size: 17px; padding-right: 54px; }
+    .start-tile > span:last-child { font-size: 15px; grid-column: 2; }
+    .t-badge { top: 12px; right: 12px; }
+    .start-head h1 { font-size: 28px; }
+    .studio-screen { padding-bottom: 88px; }
+    .studio-foot-in { min-height: 72px; }
+    .slide-nav .muted { font-size: 14px; }
+  }
 </style>
 </head>
 <body>
@@ -232,51 +390,141 @@
   </div>
 </section>
 
-<!-- 1b. Quiz builder -->
-<section class="screen" data-screen="editor" hidden>
-  <div class="wrap">
-    <nav class="h-nav"><a class="brand" href="/"><img src="/img/icon.svg" alt="">kalakal</a><button class="btn btn-ghost btn-sm" type="button" id="backToSetup">Back</button></nav>
-    <div class="row" style="padding-bottom: 18px"><span class="mode-chip" id="builderMode"></span><span class="muted" id="builderHint"></span></div>
-    <p class="live-edit" id="liveEdit" hidden></p>
-    <div class="stack" style="padding-bottom: 120px">
-      <div class="field"><label for="quizTitle">Session title</label><input id="quizTitle" type="text" maxlength="80" placeholder="Friday team session"></div>
-      <details class="card stack meta-card" id="metaCard">
-        <summary><span class="eyebrow">Save &amp; share</span><span class="muted" id="saveState">Not saved to your account yet</span></summary>
-        <div class="stack" style="gap: 14px; padding-top: 14px">
-          <div class="field"><label for="qDesc">Short description (shown in the library)</label><textarea id="qDesc" maxlength="300" rows="2" placeholder="e.g. 10 fun questions about Pongal for families"></textarea></div>
-          <div class="meta-grid">
-            <div class="field"><label for="qCategory">Category</label><select id="qCategory"></select></div>
-            <div class="field"><label for="qLanguage">Language</label><select id="qLanguage"><option>English</option><option>Tamil</option><option>Swedish</option><option>Hindi</option><option>Spanish</option><option>French</option><option>German</option><option>Arabic</option><option>Finnish</option><option>Norwegian</option><option>Danish</option><option>Other</option></select></div>
-            <div class="field"><label for="qAge">Best for</label><select id="qAge"><option value="everyone">Everyone</option><option value="kids">Kids</option><option value="teens">Teens</option><option value="adults">Adults</option></select></div>
-          </div>
-          <fieldset class="vis"><legend>Who can see it?</legend>
-            <label><input type="radio" name="vis" value="private" checked><span><strong>Private</strong> Only you. You can still host it.</span></label>
-            <label><input type="radio" name="vis" value="unlisted"><span><strong>Unlisted</strong> Anyone with the link can host or copy it.</span></label>
-            <label><input type="radio" name="vis" value="public"><span><strong>Public</strong> In the Kalakal library for everyone. Answers stay hidden on its page.</span></label>
-          </fieldset>
-          <div class="row"><button class="btn btn-primary btn-sm" type="button" id="saveQuiz">Save to My quizzes</button><span class="muted" style="font-size: 15px">Sign in with Google to save. Players never need an account.</span></div>
-        </div>
-      </details>
-      <div class="card stack" style="gap: 12px">
-        <p class="eyebrow">Fast ways to add questions</p>
-        <div class="fast">
-          <button class="btn btn-primary btn-sm ai-btn" type="button" id="openAi"><span aria-hidden="true">✦</span> Create with AI</button>
-          <button class="btn btn-ghost btn-sm" type="button" id="openPaste">Paste or type questions</button>
-          <button class="btn btn-ghost btn-sm" type="button" id="importBtn">Import spreadsheet</button>
-          <button class="btn btn-ghost btn-sm" type="button" id="templateBtn">Download template</button>
-          <button class="btn btn-ghost btn-sm" type="button" id="exportBtn">Export as spreadsheet</button>
-          <a class="muted" href="/create.html" style="font-weight: 700">How it works</a>
-          <input type="file" id="importFile" accept=".csv,.tsv,.txt,text/csv,text/plain" hidden>
-        </div>
-        <p class="error" id="importErr" role="alert" hidden></p>
-      </div>
-      <div class="stack" id="qList"></div>
-      <div class="card stack"><p class="eyebrow">Add a slide</p><div class="stack" id="typePicker" style="gap: 18px"></div></div>
-      <p class="error" id="editErr" role="alert" hidden></p>
-      <div class="row"><button class="btn btn-primary" type="button" id="playCustom">Create game</button><span class="muted" id="draftNote"></span></div>
+<!-- 1b. Quiz builder: three steps (Questions → Details → Save & play) -->
+<section class="screen studio-screen" data-screen="editor" hidden>
+  <header class="studio-top">
+    <div class="wrap studio-bar">
+      <a class="brand" href="/"><img src="/img/icon.svg" alt="">kalakal</a>
+      <ol class="stepper" aria-label="Steps">
+        <li><button type="button" data-go="questions" aria-current="step"><span class="st-n">1</span><span class="st-l">Questions</span></button></li>
+        <li><button type="button" data-go="details"><span class="st-n">2</span><span class="st-l">Details</span></button></li>
+        <li><button type="button" data-go="finish"><span class="st-n">3</span><span class="st-l">Save &amp; play</span></button></li>
+      </ol>
+      <div class="row studio-acct"><span id="acctChip"></span><button class="btn btn-ghost btn-sm" type="button" id="backToSetup">Exit</button></div>
     </div>
+  </header>
+
+  <div class="wrap studio">
+    <p class="live-edit" id="liveEdit" hidden></p>
+
+    <!-- Sign-in banner (signed out only) -->
+    <div class="signin-banner" id="signinBanner" hidden>
+      <img class="mascot" src="/img/mascots/host-happy.webp" alt="" width="64" height="91">
+      <div class="sb-text">
+        <p class="sb-title">Sign in to save your quiz</p>
+        <p class="sb-sub" id="signinSub">Right now this quiz is only kept in this browser. Sign in with Google to keep it on all your devices, play it again any time and share it in the library. Players never need an account.</p>
+        <p class="sb-short">It's only kept in this browser until you sign in.</p>
+      </div>
+      <button class="btn btn-google" type="button" data-signin><span class="g-logo" aria-hidden="true"></span>Sign in with Google</button>
+    </div>
+
+    <!-- Step 1: questions -->
+    <div class="step" data-step="questions">
+      <!-- 1a. Empty quiz: choose how to start -->
+      <div class="start-pane" id="startPane" hidden>
+        <div class="start-head">
+          <span class="mode-chip" id="builderMode"></span>
+          <h1>How do you want to start?</h1>
+          <p class="muted" id="builderHint"></p>
+        </div>
+        <div class="start-grid" id="startGrid">
+          <button class="start-tile t-ai" type="button" data-start="ai"><span class="t-badge">Fastest</span><span class="t-icon" aria-hidden="true">✦</span><strong>Create with AI</strong><span>Type a topic. Get 10 ready questions in seconds.</span></button>
+          <button class="start-tile t-link" type="button" data-start="link"><span class="t-badge">New</span><span class="t-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></svg></span><strong>From a web link</strong><span>Paste an article or Wikipedia page. AI asks about what's on it.</span></button>
+          <button class="start-tile t-paste" type="button" data-start="paste"><span class="t-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></span><strong>Type or paste</strong><span>Write all your questions in one box. Fastest by hand.</span></button>
+          <button class="start-tile t-sheet" type="button" data-start="import"><span class="t-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M4 15h16M10 4v16"/></svg></span><strong>From a spreadsheet</strong><span>Import a CSV from Excel or Google Sheets.</span></button>
+          <button class="start-tile t-blank" type="button" data-start="blank"><span class="t-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><strong>Start from scratch</strong><span>Build it one question at a time.</span></button>
+        </div>
+        <p class="muted start-foot">Want an example first? <button class="link-btn inline" type="button" id="startExample">Open the ready-made warm-up</button> and change it. · <a href="/create.html">See how each way works</a></p>
+      </div>
+
+      <!-- 1b. Question editor: outline on the left, one question at a time on the right -->
+      <div class="build" id="buildPane">
+        <aside class="outline" aria-label="Your questions">
+          <div class="ol-head"><p class="eyebrow">Questions</p><span class="pill" id="olCount">0</span></div>
+          <ol class="ol-list" id="outline"></ol>
+          <button class="btn btn-ghost btn-sm ol-add" type="button" id="addSlideBtn">+ Add question</button>
+          <div class="ol-more">
+            <p class="ol-more-t">Add more questions with</p>
+            <button class="ol-way" type="button" id="openAi"><span class="w-ic ai" aria-hidden="true">✦</span>AI</button>
+            <button class="ol-way" type="button" id="openLink"><span class="w-ic link" aria-hidden="true">🔗</span>A web link</button>
+            <button class="ol-way" type="button" id="openPaste"><span class="w-ic paste" aria-hidden="true">✎</span>Type or paste</button>
+            <button class="ol-way" type="button" id="importBtn"><span class="w-ic sheet" aria-hidden="true">▦</span>Spreadsheet</button>
+            <input type="file" id="importFile" accept=".csv,.tsv,.txt,text/csv,text/plain" hidden>
+          </div>
+        </aside>
+        <div class="slide-pane">
+          <p class="error" id="importErr" role="alert" hidden></p>
+          <div id="qList"></div>
+          <div class="slide-nav">
+            <button class="btn btn-ghost btn-sm" type="button" id="prevQ">← Previous</button>
+            <span class="muted" id="qPos"></span>
+            <button class="btn btn-ghost btn-sm" type="button" id="nextQ">Next →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: details -->
+    <div class="step" data-step="details" hidden>
+      <div class="step-card card stack">
+        <div><p class="eyebrow">Step 2</p><h1 class="step-h">Name and describe it</h1></div>
+        <div class="field"><label for="quizTitle">Title</label><input id="quizTitle" type="text" maxlength="80" placeholder="Friday team quiz"></div>
+        <div class="field"><label for="qDesc">Short description <span class="muted" style="font-weight:600">(optional, shown in the library)</span></label><textarea id="qDesc" maxlength="300" rows="2" placeholder="e.g. 10 fun questions about Pongal for families"></textarea></div>
+        <div class="meta-grid">
+          <div class="field"><label for="qCategory">Category</label><select id="qCategory"></select></div>
+          <div class="field"><label for="qLanguage">Language</label><select id="qLanguage"><option>English</option><option>Tamil</option><option>Swedish</option><option>Hindi</option><option>Spanish</option><option>French</option><option>German</option><option>Arabic</option><option>Finnish</option><option>Norwegian</option><option>Danish</option><option>Other</option></select></div>
+          <div class="field"><label for="qAge">Best for</label><select id="qAge"><option value="everyone">Everyone</option><option value="kids">Kids</option><option value="teens">Teens</option><option value="adults">Adults</option></select></div>
+        </div>
+        <fieldset class="vis"><legend>Who can see it when you save it?</legend>
+          <label><input type="radio" name="vis" value="private" checked><span><strong>Private</strong> Only you. You can still host it.</span></label>
+          <label><input type="radio" name="vis" value="unlisted"><span><strong>Unlisted</strong> Anyone with the link can host or copy it.</span></label>
+          <label><input type="radio" name="vis" value="public"><span><strong>Public</strong> In the Kalakal library for everyone. Answers stay hidden on its page.</span></label>
+        </fieldset>
+        <div class="sheet-tools"><span class="muted">Spreadsheet:</span><button class="link-btn inline" type="button" id="exportBtn">Export these questions</button><button class="link-btn inline" type="button" id="templateBtn">Download the empty template</button></div>
+      </div>
+    </div>
+
+    <!-- Step 3: save & play -->
+    <div class="step" data-step="finish" hidden>
+      <div class="finish-head"><p class="eyebrow">Step 3</p><h1 class="step-h" id="finishTitle">Ready to play</h1><p class="muted" id="finishSummary"></p></div>
+      <div class="finish-grid">
+        <div class="card stack finish-save" id="saveCard">
+          <div class="fc-head"><span class="fc-ic save" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></svg></span><div><h2>Save to My quizzes</h2><p class="muted" id="saveState">Not saved to your account yet</p></div></div>
+          <div id="saveSignedOut" class="stack" hidden>
+            <ul class="ticks"><li>Keep it on every device</li><li>Edit and play it again any time</li><li>Share it in the public library</li></ul>
+            <button class="btn btn-google btn-block" type="button" data-signin><span class="g-logo" aria-hidden="true"></span>Sign in with Google to save</button>
+            <p class="muted fine">Free. We only use your name, email and picture.</p>
+          </div>
+          <div id="saveSignedIn" class="stack" hidden>
+            <p class="muted" id="saveVisNote"></p>
+            <button class="btn btn-primary btn-block" type="button" id="saveQuiz">Save to My quizzes</button>
+          </div>
+          <p class="muted fine" id="saveOff" hidden>Saving to an account is coming soon. Your quiz stays in this browser.</p>
+        </div>
+        <div class="card stack finish-play">
+          <div class="fc-head"><span class="fc-ic play" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg></span><div><h2 id="playHead">Play now</h2><p class="muted" id="playSub">You get a PIN. Players join on their phones.</p></div></div>
+          <button class="btn btn-primary btn-block btn-xl" type="button" id="playCustom">Create game</button>
+        </div>
+      </div>
+    </div>
+    <p class="error" id="editErr" role="alert" hidden></p>
   </div>
+
+  <footer class="studio-foot" id="studioFoot">
+    <div class="wrap studio-foot-in">
+      <button class="btn btn-ghost btn-sm" type="button" id="stepBack">← Back</button>
+      <span class="muted draft-note" id="draftNote"></span>
+      <button class="btn btn-primary" type="button" id="stepNext">Next: Details →</button>
+    </div>
+  </footer>
 </section>
+
+<dialog class="paste type-dlg" id="typeDlg" aria-labelledby="typeTitle">
+  <div class="stack" style="gap: 14px">
+    <div class="row" style="justify-content: space-between"><h2 id="typeTitle" style="font-size: 26px">Add a question</h2><button class="icon-btn" type="button" id="typeClose" aria-label="Close">Close</button></div>
+    <div class="stack" id="typePicker" style="gap: 18px"></div>
+  </div>
+</dialog>
 
 <!-- 2. Lobby -->
 <section class="screen" data-screen="lobby" hidden>
@@ -385,13 +633,21 @@
 <dialog class="paste ai" id="aiDlg" aria-labelledby="aiTitle">
   <div class="stack" style="gap: 16px" id="aiForm">
     <div class="row" style="justify-content: space-between"><div class="row"><h2 id="aiTitle" style="font-size: 26px">Create with AI</h2><span class="ai-left" id="aiLeft"></span></div><button class="icon-btn" type="button" data-ai="close" aria-label="Close">Close</button></div>
-    <div class="field"><label for="aiTopic">What should the quiz be about?</label><input id="aiTopic" type="text" maxlength="200" placeholder="e.g. Pongal festival, the solar system, Swedish football, our company history"></div>
-    <details class="ai-src" id="aiSrcBox"><summary>Or use your own notes, an article or a PDF</summary>
-      <div class="stack" style="gap: 10px; padding-bottom: 14px">
-        <textarea id="aiSource" placeholder="Paste lesson notes, an article or meeting text. The AI will only ask about what's in it." aria-label="Your notes"></textarea>
-        <div class="row"><button class="btn btn-ghost btn-sm" type="button" id="aiFileBtn">Use a PDF or text file</button><span class="muted" id="aiFileNote"></span><input type="file" id="aiFile" accept=".pdf,.txt,.md,application/pdf,text/plain" hidden></div>
-      </div>
-    </details>
+    <div class="seg" role="tablist" aria-label="What should the AI use?">
+      <button type="button" role="tab" data-src="topic" aria-selected="true">A topic</button>
+      <button type="button" role="tab" data-src="link" aria-selected="false">A web link</button>
+      <button type="button" role="tab" data-src="notes" aria-selected="false">My notes or PDF</button>
+    </div>
+    <div class="field src-pane" data-pane="topic"><label for="aiTopic">What should the quiz be about?</label><input id="aiTopic" type="text" maxlength="200" placeholder="e.g. Pongal festival, the solar system, Swedish football, our company history"></div>
+    <div class="stack src-pane" data-pane="link" style="gap: 8px" hidden>
+      <div class="field"><label for="aiUrl">Paste the link to a web page</label><input id="aiUrl" type="url" inputmode="url" maxlength="2000" placeholder="https://en.wikipedia.org/wiki/Thai_Pongal" autocomplete="off"></div>
+      <p class="muted fine">Works best with articles, Wikipedia, blogs and news. The AI only asks about what's on the page. Videos, PDFs and pages behind a login can't be read.</p>
+    </div>
+    <div class="stack src-pane" data-pane="notes" style="gap: 10px" hidden>
+      <label for="aiSource">Paste your notes, an article or meeting text</label>
+      <textarea id="aiSource" class="ai-notes" placeholder="The AI will only ask about what's in this text."></textarea>
+      <div class="row"><button class="btn btn-ghost btn-sm" type="button" id="aiFileBtn">Use a PDF or text file</button><span class="muted" id="aiFileNote"></span><input type="file" id="aiFile" accept=".pdf,.txt,.md,application/pdf,text/plain" hidden></div>
+    </div>
     <div class="ai-opts">
       <div class="field"><label for="aiCount">Questions</label><select id="aiCount"><option>5</option><option selected>10</option><option>15</option><option>20</option></select></div>
       <div class="field"><label for="aiLevel">Difficulty</label><select id="aiLevel"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option><option value="mixed">Mixed</option></select></div>

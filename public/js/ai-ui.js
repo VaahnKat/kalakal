@@ -7,6 +7,8 @@ const PREFS = "kalakal:ai";
 const MAX_SOURCE = 12000;
 let review = [];          // [{ slide, on }]
 let lastOpts = null;
+let lastPage = null;      // { title, host } when the quiz came from a web link
+let src = "topic";        // what the AI uses: topic | link | notes
 let hooks = { add: () => {}, title: () => "", fallback: () => {} };
 
 const dlg = () => $("#aiDlg");
@@ -15,7 +17,9 @@ const err = (el, text) => { el.textContent = text || ""; el.hidden = !text; };
 
 export function initAi(h) {
   hooks = { ...hooks, ...h };
-  $("#openAi").addEventListener("click", open);
+  $("#openAi").addEventListener("click", () => open());
+  document.querySelector("#aiDlg .seg").addEventListener("click", (e) => { const b = e.target.closest("[data-src]"); if (b) setSrc(b.dataset.src, true); });
+  $("#aiUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); generate(); } });
   dlg().addEventListener("click", (e) => { if (e.target.closest('[data-ai="close"]')) dlg().close(); });
   $("#aiLang").addEventListener("change", () => { $("#aiLangOtherBox").hidden = $("#aiLang").value !== "other"; });
   $("#aiFileBtn").addEventListener("click", () => $("#aiFile").click());
@@ -33,7 +37,18 @@ export function initAi(h) {
   });
 }
 
-function open() {
+function setSrc(name, focus) {
+  src = name;
+  document.querySelectorAll("#aiDlg [data-src]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.src === name)));
+  document.querySelectorAll("#aiDlg [data-pane]").forEach((p) => (p.hidden = p.dataset.pane !== name));
+  $("#aiGo").textContent = name === "link" ? "Read the page and write my quiz" : "Write my quiz";
+  if (focus) ({ topic: $("#aiTopic"), link: $("#aiUrl"), notes: $("#aiSource") })[name].focus();
+}
+
+// Open the AI window, optionally on one source ("topic", "link" or "notes")
+export function openAi(which) { open(which); }
+
+function open(which) {
   try {
     const p = JSON.parse(localStorage.getItem(PREFS) || "{}");
     for (const [id, k] of [["aiCount", "count"], ["aiLevel", "level"], ["aiAudience", "audience"], ["aiTime", "time"]]) if (p[k]) $("#" + id).value = String(p[k]);
@@ -46,9 +61,11 @@ function open() {
   } catch { /* first time */ }
   if (!$("#aiTopic").value) $("#aiTopic").value = hooks.title();
   err($("#aiErr")); $("#aiPrompt").hidden = true;
+  if (which) { review = []; $("#aiList").innerHTML = ""; }
+  setSrc(which || src, false);
   step(review.length ? "aiReview" : "aiForm");
   dlg().showModal();
-  if (!review.length) $("#aiTopic").focus();
+  if (!review.length) ({ topic: $("#aiTopic"), link: $("#aiUrl"), notes: $("#aiSource") })[src].focus();
   refreshLeft();
 }
 
@@ -62,11 +79,13 @@ async function refreshLeft(left) {
 function options() {
   const language = $("#aiLang").value === "other" ? $("#aiLangOther").value.trim() : $("#aiLang").value;
   const o = {
-    topic: $("#aiTopic").value.trim(), source: $("#aiSource").value.trim().slice(0, MAX_SOURCE),
+    topic: src === "topic" ? $("#aiTopic").value.trim() : "",
+    source: src === "notes" ? $("#aiSource").value.trim().slice(0, MAX_SOURCE) : "",
+    ...(src === "link" ? { url: $("#aiUrl").value.trim() } : {}),
     count: Number($("#aiCount").value), level: $("#aiLevel").value, audience: $("#aiAudience").value,
     language: language || "English", time: Number($("#aiTime").value), trueFalse: $("#aiTF").checked,
   };
-  try { localStorage.setItem(PREFS, JSON.stringify({ ...o, topic: undefined, source: undefined })); } catch { /* ignore */ }
+  try { localStorage.setItem(PREFS, JSON.stringify({ ...o, topic: undefined, source: undefined, url: undefined })); } catch { /* ignore */ }
   return o;
 }
 
@@ -80,13 +99,20 @@ async function call(path, body) {
 
 async function generate() {
   const o = options();
-  if (!o.topic && !o.source) { err($("#aiErr"), "Write a topic, or paste some notes for the AI to use."); $("#aiTopic").focus(); return; }
+  if (src === "topic" && !o.topic) { err($("#aiErr"), "Write what the quiz should be about."); $("#aiTopic").focus(); return; }
+  if (src === "notes" && o.source.length < 40) { err($("#aiErr"), "Paste a bit more text (a few sentences at least), or choose a PDF."); $("#aiSource").focus(); return; }
+  if (src === "link") {
+    if (o.url && !/^https?:\/\//i.test(o.url)) { o.url = "https://" + o.url; $("#aiUrl").value = o.url; }
+    let ok = false; try { ok = /^https?:$/.test(new URL(o.url).protocol); } catch { /* not a URL */ }
+    if (!ok) { err($("#aiErr"), "Paste a web address, like https://en.wikipedia.org/wiki/Pongal"); $("#aiUrl").focus(); return; }
+  }
   err($("#aiErr")); $("#aiPrompt").hidden = true;
-  $("#aiBusyTitle").textContent = `Writing ${o.count} questions${o.language !== "English" ? ` in ${o.language}` : ""}…`;
+  $("#aiBusyTitle").textContent = src === "link" ? `Reading the page and writing ${o.count} questions…` : `Writing ${o.count} questions${o.language !== "English" ? ` in ${o.language}` : ""}…`;
   step("aiBusy");
   try {
     const data = await call("/api/ai/quiz", o);
-    lastOpts = o;
+    lastPage = data.page || null;
+    lastOpts = lastPage ? { ...o, url: undefined, topic: lastPage.title || lastPage.host } : o;
     review = data.slides.map((slide) => ({ slide, on: true }));
     renderReview(); step("aiReview"); refreshLeft(data);
     if (data.slides.length < o.count) err($("#aiReviewErr"), `The AI wrote ${data.slides.length} usable questions instead of ${o.count}.`);
@@ -189,7 +215,7 @@ function addChosen() {
   for (const [i, r] of review.entries()) if (r.edit) { const problem = finishEdit(i); if (problem) { err($("#aiReviewErr"), `Question ${i + 1}: ${problem}`); return; } }
   const slides = review.filter((r) => r.on).map((r) => r.slide);
   if (!slides.length) return;
-  hooks.add(slides);
+  hooks.add(slides, lastPage ? { title: lastPage.title, host: lastPage.host } : { title: lastOpts && lastOpts.topic });
   review = []; $("#aiList").innerHTML = "";
   dlg().close();
 }

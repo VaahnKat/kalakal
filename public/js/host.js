@@ -3,7 +3,7 @@ import { DEMO_QUIZ, DEMO_MEETING, SLIDE_TYPES, TYPE_LABEL, blankSlide } from "/j
 import { avatarSvg } from "/js/avatar.js";
 import { parseQuick, parseSpreadsheetFile, toCSV, TEMPLATE_CSV, aiPrompt, mediaFromLink } from "/js/quicktype.js";
 import { compressImage, ytThumb, mediaHtml, parseTime, fmtTime } from "/js/media.js";
-import { initAi } from "/js/ai-ui.js";
+import { initAi, openAi } from "/js/ai-ui.js";
 import { me, api, signIn, mountNav } from "/js/account.js";
 
 const params = new URLSearchParams(location.search);
@@ -41,7 +41,7 @@ let currentQuiz = null;    // the quiz the server has for this game
 let pendingMedia = null;
 const draftKey = () => (editingPin ? "kalakal:draft:game:" + editingPin : "kalakal:draft:" + builderMode);
 function saveDraft() {
-  try { localStorage.setItem(draftKey(), JSON.stringify(draft)); $("#draftNote").textContent = draft.id ? "Draft kept in this browser · press Save to My quizzes to update your saved quiz" : "Draft saved in this browser"; }
+  try { localStorage.setItem(draftKey(), JSON.stringify(draft)); $("#draftNote").textContent = draft.id ? "Changes kept in this browser · press Save changes on step 3 to update your saved quiz" : "Draft saved in this browser"; }
   catch { $("#draftNote").textContent = "Too big to save in this browser: use picture links instead of uploads for some questions."; }
 }
 // Older drafts stored one correct answer as a number
@@ -76,28 +76,131 @@ function quizToDraft(quiz, media = []) {
 function openBuilder(mode, preset = null) {
   builderMode = mode;
   draft = preset || JSON.parse(localStorage.getItem(draftKey()) || "null") || { title: "", questions: [blankSlide(mode === "play" ? "quiz" : "poll")] };
-  if (preset) saveDraft();
+  if (preset) { draft.started = true; saveDraft(); }
   $("#liveEdit").hidden = !editingPin;
   $("#liveEdit").textContent = editingPin ? `Editing the live game · PIN ${editingPin.replace(/(\d{3})(\d{3})/, "$1 $2")}. Players stay in the lobby. Press Save when you're done.` : "";
   $("#playCustom").textContent = editingPin ? "Save and back to lobby" : "Create game";
-  $("#backToSetup").textContent = editingPin ? "Back to lobby" : "Back";
+  $("#playHead").textContent = editingPin ? "Back to your game" : "Play now";
+  $("#playSub").textContent = editingPin ? "Players waiting in the lobby get the new questions." : "You get a PIN. Players join on their phones.";
+  $("#backToSetup").textContent = editingPin ? "Back to lobby" : "Exit";
   draft.questions.forEach((q) => { if (!q.type) q.type = "quiz"; tidy(q); });
   $("#builderMode").textContent = mode === "play" ? "Kalakal Play · Quiz game" : "Kalakal Pulse · Live polls & feedback";
   $("#builderMode").className = "mode-chip " + (mode === "kural" ? "kural" : "");
-  $("#builderHint").textContent = mode === "play" ? "Players score points for right, fast answers." : "No scores: answers show live and anonymously.";
+  $("#builderHint").textContent = mode === "play" ? "Players score points for right, fast answers. Pick the way that suits you: you can mix them later." : "No scores: answers show live and anonymously. Pick the way that suits you: you can mix them later.";
   $("#quizTitle").placeholder = mode === "play" ? "Friday team quiz" : "Monday team check-in";
-  $("#openAi").hidden = mode !== "play";
+  // The AI writes quiz questions only
+  for (const el of document.querySelectorAll('[data-start="ai"], [data-start="link"], #openAi, #openLink')) el.hidden = mode !== "play";
+  $("#startExample").textContent = mode === "play" ? "Open the ready-made warm-up quiz" : "Open the ready-made meeting warm-up";
   renderMeta();
   const group = (m, label) => `<div class="stack" style="gap:10px"><p class="muted" style="font-weight:700">${label}</p><div class="type-picker">${SLIDE_TYPES.filter((t) => t.mode === m).map((t) => `<button class="type-btn" type="button" data-type="${t.type}"><strong>${t.label}</strong><span>${t.hint}</span></button>`).join("")}</div></div>`;
   $("#typePicker").innerHTML = mode === "play"
-    ? group("play", "Quiz games") + group("kural", "Mix in a poll or feedback slide (optional)")
+    ? group("play", "Quiz questions") + group("kural", "Mix in a poll or feedback slide (optional)")
     : group("kural", "Live polls & feedback") + group("play", "Mix in a scored quiz question (optional)");
-  renderEditor(); show("editor");
+  sel = 0;
+  renderEditor(); goStep("questions", { check: false }); show("editor"); refreshAccount();
 }
+
+// ---------- builder steps ----------
+let sel = 0;               // the question shown in the editor
+let step = "questions";
+const STEPS = ["questions", "details", "finish"];
+const isBlank = (q) => !(q.text || "").trim() && (q.answers || []).every((a) => !a.trim()) && (q.statements || []).every((x) => !x.trim()) && !q.media;
+const showStart = () => !draft.started && draft.questions.every(isBlank) && !editingPin;
+
+function goStep(name, { check = true } = {}) {
+  const err = $("#editErr"); err.hidden = true;
+  if (check && step === "questions" && name !== "questions") {
+    const b = buildQuiz();
+    if (b.error) { err.textContent = b.error; err.hidden = false; if (b.at >= 0) { sel = b.at; renderEditor(); } return; }
+  }
+  step = name;
+  document.querySelectorAll("[data-step]").forEach((el) => (el.hidden = el.dataset.step !== name));
+  const at = STEPS.indexOf(name);
+  document.querySelectorAll(".stepper li").forEach((li, i) => {
+    li.classList.toggle("done", i < at);
+    const btn = li.querySelector("button");
+    if (i === at) btn.setAttribute("aria-current", "step"); else btn.removeAttribute("aria-current");
+  });
+  updateChrome();
+  $("#stepBack").hidden = name === "questions";
+  $("#stepNext").hidden = name === "finish" || (name === "questions" && showStart());
+  $("#stepNext").textContent = name === "questions" ? "Next: Details →" : "Next: Save & play →";
+  if (name === "finish") renderFinish();
+  window.scrollTo({ top: 0 });
+}
+document.querySelector(".stepper").addEventListener("click", (e) => { const b = e.target.closest("[data-go]"); if (b) goStep(b.dataset.go); });
+$("#stepNext").addEventListener("click", () => goStep(STEPS[STEPS.indexOf(step) + 1]));
+$("#stepBack").addEventListener("click", () => goStep(STEPS[STEPS.indexOf(step) - 1], { check: false }));
+
+function renderFinish() {
+  const b = buildQuiz();
+  const n = b.quiz ? b.quiz.questions.length : 0;
+  const scored = b.quiz ? b.quiz.questions.filter((q) => q.type === "quiz") : [];
+  const mins = Math.max(1, Math.round(scored.reduce((t, q) => t + q.time + 12, 0) / 60 + (n - scored.length) * 1.5));
+  $("#finishTitle").textContent = draft.title.trim() || (builderMode === "play" ? "Your quiz is ready" : "Your session is ready");
+  $("#finishSummary").textContent = `${n} ${builderMode === "play" ? "question" : "slide"}${n === 1 ? "" : "s"} · about ${mins} minute${mins === 1 ? "" : "s"} to play`;
+  renderMeta();
+}
+
+// Start screen tiles
+$("#startGrid").addEventListener("click", (e) => {
+  const t = e.target.closest("[data-start]"); if (!t) return;
+  const how = t.dataset.start;
+  if (how === "blank") { draft.started = true; saveDraft(); renderEditor(); goStep("questions", { check: false }); const el = $('#qList [data-f="text"]'); el && el.focus(); return; }
+  if (how === "ai") openAi("topic");
+  if (how === "link") openAi("link");
+  if (how === "paste") $("#openPaste").click();
+  if (how === "import") $("#importBtn").click();
+});
+$("#startExample").addEventListener("click", () => editReady(builderMode === "play" ? DEMO_QUIZ : DEMO_MEETING, builderMode));
+$("#openLink").addEventListener("click", () => openAi("link"));
+
+// Outline and one-question-at-a-time navigation
+$("#outline").addEventListener("click", (e) => { const b = e.target.closest("[data-sel]"); if (!b) return; sel = Number(b.dataset.sel); renderEditor(); });
+$("#prevQ").addEventListener("click", () => { if (sel > 0) { sel--; renderEditor(); } });
+$("#nextQ").addEventListener("click", () => {
+  if (sel < draft.questions.length - 1) sel++;
+  else { const cur = draft.questions[sel]; draft.questions.push(cur.type === "quiz" ? { ...blankSlide(cur.tf ? "truefalse" : "quiz"), time: cur.time, points: 1 } : blankSlide(cur.type)); sel = draft.questions.length - 1; saveDraft(); }
+  renderEditor(); const el = $('#qList [data-f="text"]'); el && el.focus();
+});
+const typeDlg = $("#typeDlg");
+$("#addSlideBtn").addEventListener("click", () => typeDlg.showModal());
+$("#typeClose").addEventListener("click", () => typeDlg.close());
+
+// ---------- account: sign-in banner, header chip, save card ----------
+let account = { accounts: false, signIn: false, user: null };
+// Banner: full on the start screen, slim while editing, hidden on Save & play (the save card asks instead)
+function updateChrome() {
+  if (!draft) return;
+  const start = step === "questions" && showStart();
+  const b = $("#signinBanner");
+  b.hidden = !!account.user || !(account.accounts && account.signIn) || !!editingPin || step === "finish";
+  b.classList.toggle("slim", !start);
+  $("#studioFoot").hidden = start;
+}
+async function refreshAccount() {
+  account = await me();
+  const u = account.user, canSignIn = account.accounts && account.signIn;
+  $("#acctChip").innerHTML = u
+    ? `<a class="acct-mini" href="/me.html" title="My quizzes">${u.picture ? `<img src="${esc(u.picture)}" alt="" referrerpolicy="no-referrer">` : `<span class="ini">${esc((u.name || "?").charAt(0).toUpperCase())}</span>`}<span>${esc(u.name)}</span></a>`
+    : canSignIn ? '<button class="btn btn-google btn-sm" type="button" data-signin><span class="g-logo" aria-hidden="true"></span>Sign in</button>' : "";
+  updateChrome();
+  renderMeta();
+}
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("[data-signin]")) return;
+  if (draft) { draft.started = true; saveDraft(); }
+  signIn(`/host.html?build=${builderMode}${draft && draft.id ? `&quiz=${draft.id}` : ""}`);
+});
+
 $("#typePicker").addEventListener("click", (e) => {
   const b = e.target.closest("[data-type]"); if (!b) return;
-  draft.questions.push(blankSlide(b.dataset.type)); saveDraft(); renderEditor();
-  const inputs = document.querySelectorAll('#qList [data-f="text"]'); inputs[inputs.length - 1].focus();
+  typeDlg.close();
+  draft.started = true;
+  // Replace an untouched empty slide instead of leaving it behind
+  if (draft.questions.length === 1 && isBlank(draft.questions[0])) draft.questions = [];
+  draft.questions.push(blankSlide(b.dataset.type)); sel = draft.questions.length - 1; saveDraft(); renderEditor();
+  const el = $('#qList [data-f="text"]'); el && el.focus();
 });
 
 const TICK = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="#160B2A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -143,21 +246,57 @@ function slideFields(q, qi) {
   return `<p class="muted">${hint}</p>`;
 }
 
+// What still needs doing on a slide ("" when it's ready)
+function slideProblem(q) {
+  if (isBlank(q)) return "Empty";
+  if (!(q.text || "").trim()) return "Needs a question";
+  if (q.type === "quiz" || q.type === "poll") {
+    const filled = q.answers.map((a, ai) => ({ a: a.trim(), ai })).filter((x) => x.a);
+    if (filled.length < 2) return `Needs 2 ${q.type === "poll" ? "options" : "answers"}`;
+    if (q.type === "quiz" && !filled.some((x) => q.correct.includes(x.ai))) return "Mark the right answer";
+  }
+  if (q.type === "scale" && !q.statements.some((x) => x.trim())) return "Needs a statement";
+  return "";
+}
+
+function renderOutline() {
+  const n = draft.questions.length;
+  $("#olCount").textContent = n;
+  $("#outline").innerHTML = draft.questions.map((q, i) => {
+    const problem = slideProblem(q), text = (q.text || "").trim();
+    return `<li><button class="ol-item ${problem ? (problem === "Empty" ? "" : "todo") : "ok"}" type="button" data-sel="${i}" aria-current="${i === sel}" title="${esc(problem || text)}">
+      <span class="ol-num">${i + 1}</span><span class="ol-txt${text ? "" : " empty"}">${text ? esc(text) : problem === "Empty" ? "New question" : esc(problem)}</span>${q.media ? '<span class="ol-pic" aria-label="has media">▣</span>' : ""}</button></li>`;
+  }).join("");
+  $("#qPos").textContent = `${builderMode === "play" ? "Question" : "Slide"} ${sel + 1} of ${n}`;
+  $("#prevQ").disabled = sel === 0;
+  $("#nextQ").textContent = sel < n - 1 ? "Next →" : "+ New question";
+  const cur = $('#outline [aria-current="true"]'); cur && cur.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
 function renderEditor() {
+  if (sel >= draft.questions.length) sel = draft.questions.length - 1;
+  if (sel < 0) sel = 0;
   $("#quizTitle").value = draft.title;
-  $("#qList").innerHTML = draft.questions.map((q, qi) => `
+  const start = showStart();
+  $("#startPane").hidden = !start; $("#buildPane").hidden = start;
+  if (step === "questions") $("#stepNext").hidden = start;
+  updateChrome();
+  const qi = sel, q = draft.questions[qi], last = draft.questions.length - 1;
+  $("#qList").innerHTML = `
     <div class="card q-card" data-q="${qi}">
-      <div class="q-head"><div class="row"><p class="eyebrow">Slide ${qi + 1}</p><span class="type-tag">${q.tf ? "True or false" : TYPE_LABEL[q.type]}</span></div>
+      <div class="q-head"><div class="row"><p class="eyebrow">${builderMode === "play" ? "Question" : "Slide"} ${qi + 1}</p><span class="type-tag">${q.tf ? "True or false" : TYPE_LABEL[q.type]}</span></div>
         <div class="row">${q.type === "quiz" ? `<label class="muted" for="t${qi}" style="font-weight:600">Time</label>
           <select id="t${qi}" data-f="time">${[10, 15, 20, 30, 45, 60].map((s) => `<option value="${s}" ${s === q.time ? "selected" : ""}>${s} s</option>`).join("")}</select>
           <label class="muted" for="p${qi}" style="font-weight:600">Points</label>
           <select id="p${qi}" data-f="points">${[[1, "Normal"], [2, "Double"], [0, "No points"]].map(([v, l]) => `<option value="${v}" ${v === q.points ? "selected" : ""}>${l}</option>`).join("")}</select>` : ""}
-          <button class="icon-btn" type="button" data-f="dup" aria-label="Duplicate slide ${qi + 1}">Duplicate</button>
-          ${qi > 0 ? `<button class="icon-btn" type="button" data-f="up" aria-label="Move slide ${qi + 1} up">Move up</button>` : ""}
-          <button class="icon-btn" type="button" data-f="remove" aria-label="Remove slide ${qi + 1}">Remove</button></div></div>
-      <input type="text" data-f="text" maxlength="200" placeholder="${{ quiz: "Type your question", poll: "What do you want to ask?", wordcloud: "e.g. One word for this week", open: "e.g. What should we start doing?", scale: "e.g. How are we doing?", qa: "e.g. Ask me anything" }[q.type]}" value="${esc(q.text)}" aria-label="Slide ${qi + 1} question">
+          <button class="icon-btn" type="button" data-f="dup">Duplicate</button>
+          ${qi > 0 ? `<button class="icon-btn" type="button" data-f="up" aria-label="Move earlier">↑ Move</button>` : ""}
+          ${qi < last ? `<button class="icon-btn" type="button" data-f="down" aria-label="Move later">↓ Move</button>` : ""}
+          <button class="icon-btn" type="button" data-f="remove">Delete</button></div></div>
+      <input type="text" data-f="text" maxlength="200" placeholder="${{ quiz: "Type your question", poll: "What do you want to ask?", wordcloud: "e.g. One word for this week", open: "e.g. What should we start doing?", scale: "e.g. How are we doing?", qa: "e.g. Ask me anything" }[q.type]}" value="${esc(q.text)}" aria-label="${builderMode === "play" ? "Question" : "Slide"} ${qi + 1}">
       ${slideFields(q, qi)}
-    </div>`).join("");
+    </div>`;
+  renderOutline();
 }
 
 $("#quizTitle").addEventListener("input", (e) => { draft.title = e.target.value; saveDraft(); });
@@ -171,14 +310,16 @@ $("#qList").addEventListener("input", (e) => {
   if (f === "ytstart" || f === "ytend") { q.media[f === "ytstart" ? "start" : "end"] = parseTime(e.target.value); }
   if (f === "low") q.low = e.target.value;
   if (f === "high") q.high = e.target.value;
+  draft.started = true;
   if (f === "stmt") {
     const grow = a === q.statements.length && q.statements.length < 4;
     q.statements[a] = e.target.value;
     saveDraft();
     if (grow) { renderEditor(); const el = document.querySelector(`[data-q="${card.dataset.q}"] [data-f="stmt"][data-a="${a}"]`); el.focus(); el.setSelectionRange(99, 99); }
+    else renderOutline();
     return;
   }
-  saveDraft();
+  saveDraft(); renderOutline();
 });
 $("#qList").addEventListener("click", (e) => {
   const btn = e.target.closest("[data-f]"); if (!btn) return;
@@ -188,9 +329,14 @@ $("#qList").addEventListener("click", (e) => {
     const a = Number(btn.dataset.a), at = q.correct.indexOf(a);
     if (at >= 0) { if (q.correct.length > 1) q.correct.splice(at, 1); } else q.correct.push(a);
     q.correct.sort();
-  } else if (f === "remove") { draft.questions.splice(i, 1); if (!draft.questions.length) draft.questions.push(blankSlide(builderMode === "play" ? "quiz" : "poll")); }
-  else if (f === "up") [draft.questions[i - 1], draft.questions[i]] = [draft.questions[i], draft.questions[i - 1]];
-  else if (f === "dup") draft.questions.splice(i + 1, 0, JSON.parse(JSON.stringify(q)));
+  } else if (f === "remove") {
+    if (!isBlank(q) && !confirm(`Delete ${builderMode === "play" ? "question" : "slide"} ${i + 1}?`)) return;
+    draft.questions.splice(i, 1); if (!draft.questions.length) draft.questions.push(blankSlide(builderMode === "play" ? "quiz" : "poll"));
+    sel = Math.min(i, draft.questions.length - 1);
+  }
+  else if (f === "up") { [draft.questions[i - 1], draft.questions[i]] = [draft.questions[i], draft.questions[i - 1]]; sel = i - 1; }
+  else if (f === "down") { [draft.questions[i + 1], draft.questions[i]] = [draft.questions[i], draft.questions[i + 1]]; sel = i + 1; }
+  else if (f === "dup") { draft.questions.splice(i + 1, 0, JSON.parse(JSON.stringify(q))); sel = i + 1; }
   else if (f === "unmedia") delete q.media;
   else if (f === "upload") { pickPicture(i); return; }
   else return;
@@ -240,12 +386,7 @@ $("#qList").addEventListener("keydown", (e) => {
   const card = el.closest("[data-q]"), boxes = [...card.querySelectorAll('input[data-f="text"], input[data-f="ans"], input[data-f="stmt"]')];
   const at = boxes.indexOf(el);
   if (at >= 0 && at < boxes.length - 1) return boxes[at + 1].focus();
-  const next = card.nextElementSibling;
-  if (next) return next.querySelector('input[data-f="text"]').focus();
-  const cur = draft.questions[Number(card.dataset.q)];
-  draft.questions.push(cur.type === "quiz" ? { ...blankSlide(cur.tf ? "truefalse" : "quiz"), time: cur.time, points: 1 } : blankSlide(cur.type));
-  saveDraft(); renderEditor();
-  const inputs = document.querySelectorAll('#qList [data-f="text"]'); inputs[inputs.length - 1].focus();
+  $("#nextQ").click();
 });
 
 // ---------- paste / type questions ----------
@@ -262,12 +403,17 @@ function previewPaste() {
 }
 $("#pasteText").addEventListener("input", previewPaste);
 function addSlides(slides, replace) {
-  const keep = replace ? [] : draft.questions.filter((q) => (q.text || "").trim() || (q.answers || []).some((a) => a.trim()));
+  const keep = replace ? [] : draft.questions.filter((q) => !isBlank(q));
   draft.questions = keep.concat(slides.map(tidy)).slice(0, 50);
-  saveDraft(); renderEditor();
+  draft.started = true; sel = Math.min(keep.length, draft.questions.length - 1);
+  saveDraft(); renderEditor(); goStep("questions", { check: false });
 }
 initAi({
-  add: (slides) => { addSlides(slides, false); $("#draftNote").textContent = `Added ${slides.length} AI questions. Check them before you play.`; },
+  add: (slides, info = {}) => {
+    if (!draft.title.trim() && info.title) draft.title = info.title.slice(0, 80);
+    addSlides(slides, false);
+    $("#draftNote").textContent = `Added ${slides.length} AI questions${info.host ? ` from ${info.host}` : ""}. Check each right answer before you play.`;
+  },
   title: () => draft.title.trim(),
   fallback: () => { $("#openPaste").click(); $("#copyPrompt").click(); },
 });
@@ -302,18 +448,18 @@ $("#importFile").addEventListener("change", async (e) => {
 
 // Turn the editor draft into a playable quiz, or explain what's missing
 function buildQuiz() {
-  const out = [], media = [];
+  const out = [], media = [], label = builderMode === "play" ? "Question" : "Slide";
   for (const [i, q] of draft.questions.entries()) {
     const n = i + 1, text = (q.text || "").trim();
     const blank = !text && (q.answers || []).every((a) => !a.trim()) && (q.statements || []).every((s) => !s.trim());
     if (blank) continue;
-    if (!text) return { error: `Slide ${n} needs a question.` };
+    if (!text) return { error: `${label} ${n} needs a question.`, at: i };
     if (q.type === "quiz" || q.type === "poll") {
       const filled = q.answers.map((a, ai) => ({ a: a.trim(), ai })).filter((x) => x.a);
-      if (filled.length < 2) return { error: `Slide ${n} needs at least 2 ${q.type === "poll" ? "options" : "answers"}.` };
+      if (filled.length < 2) return { error: `${label} ${n} needs at least 2 ${q.type === "poll" ? "options" : "answers"}.`, at: i };
       if (q.type === "quiz") {
         const correct = filled.map((x, xi) => (q.correct.includes(x.ai) ? xi : -1)).filter((x) => x >= 0);
-        if (!correct.length) return { error: `Slide ${n}: tap Right on the correct answer (the one marked is empty).` };
+        if (!correct.length) return { error: `${label} ${n}: tap Right on the correct answer.`, at: i };
         media[out.length] = q.media || null;
         const slide = { type: "quiz", text, answers: filled.map((x) => x.a), correct, time: q.time, points: q.points ?? 1 };
         if (q.media && !(q.media.kind === "image" && q.media.src.startsWith("data:"))) slide.media = q.media;   // stored pictures and videos travel with the quiz
@@ -321,11 +467,11 @@ function buildQuiz() {
       } else out.push({ type: "poll", text, answers: filled.map((x) => x.a) });
     } else if (q.type === "scale") {
       const statements = q.statements.map((s) => s.trim()).filter(Boolean);
-      if (!statements.length) return { error: `Slide ${n} needs at least one statement to rate.` };
+      if (!statements.length) return { error: `${label} ${n} needs at least one statement to rate.`, at: i };
       out.push({ type: "scale", text, statements, low: q.low, high: q.high });
     } else out.push({ type: q.type, text });
   }
-  if (!out.length) return { error: "Add at least one slide." };
+  if (!out.length) return { error: `Add at least one ${builderMode === "play" ? "question" : "slide"}.`, at: 0 };
   return { quiz: { title: draft.title.trim() || (builderMode === "play" ? "My Kalakal quiz" : "My Kalakal session"), questions: out }, media };
 }
 
@@ -344,8 +490,17 @@ function renderMeta() {
   const m = draft.meta || (draft.meta = { description: "", category: builderMode === "kural" ? "work" : "general", language: "English", age: "everyone", visibility: "private" });
   $("#qDesc").value = m.description || ""; $("#qCategory").value = m.category; $("#qLanguage").value = m.language; $("#qAge").value = m.age;
   document.querySelectorAll('input[name="vis"]').forEach((r) => (r.checked = r.value === m.visibility));
-  $("#saveState").innerHTML = draft.id ? `Saved in <a href="/me.html">My quizzes</a> · <a href="/quiz.html?id=${draft.id}">quiz page</a>` : "Not saved to your account yet";
+  $("#saveState").innerHTML = draft.id ? `Saved in <a href="/me.html">My quizzes</a> · <a href="/quiz.html?id=${draft.id}">quiz page</a>` : account.user ? "Not saved yet" : "Only kept in this browser right now";
+  const canSignIn = account.accounts && account.signIn;
+  $("#saveSignedIn").hidden = !account.user;
+  $("#saveSignedOut").hidden = !!account.user || !canSignIn;
+  $("#saveOff").hidden = !!account.user || canSignIn;
+  $("#saveCard").hidden = !!editingPin;
+  const VIS = { private: "Private: only you can see it.", unlisted: "Unlisted: anyone with the link can play or copy it.", public: "Public: it goes in the library for everyone." };
+  $("#saveVisNote").innerHTML = `${VIS[m.visibility] || VIS.private} <button class="link-btn inline" type="button" data-go="details">Change</button>`;
+  $("#saveQuiz").textContent = draft.id ? "Save changes" : "Save to My quizzes";
 }
+$("#saveVisNote").addEventListener("click", (e) => { if (e.target.closest("[data-go]")) goStep("details", { check: false }); });
 for (const [id, key] of [["qDesc", "description"], ["qCategory", "category"], ["qLanguage", "language"], ["qAge", "age"]]) {
   $("#" + id).addEventListener("input", (e) => { draft.meta[key] = e.target.value; saveDraft(); });
 }
@@ -392,7 +547,7 @@ $("#saveQuiz").addEventListener("click", async () => {
   } catch (e) {
     if (e.data && e.data.needsTerms) { location.href = `/me.html?welcome=1&next=${encodeURIComponent(`/host.html?build=${builderMode}`)}`; return; }
     err.textContent = e.message; err.hidden = false; note.textContent = "Not saved";
-  } finally { btn.disabled = false; btn.textContent = "Save to My quizzes"; }
+  } finally { btn.disabled = false; btn.textContent = draft.id ? "Save changes" : "Save to My quizzes"; }
 });
 
 // Open a saved quiz from My quizzes: /host.html?build=play&quiz=<id>
@@ -744,5 +899,5 @@ const build = params.get("build");
 mountNav("host");
 if (pin) openGame();
 else if (params.get("quiz")) openSaved(params.get("quiz"));
-else if (build === "play" || build === "kural") { openBuilder(build); if (params.get("paste")) $("#openPaste").click(); else if (params.get("ai") && build === "play") $("#openAi").click(); }
+else if (build === "play" || build === "kural") { openBuilder(build); if (params.get("paste")) $("#openPaste").click(); else if (params.get("link") && build === "play") openAi("link"); else if (params.get("ai") && build === "play") $("#openAi").click(); }
 else show("setup");

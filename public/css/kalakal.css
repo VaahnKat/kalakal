@@ -63,7 +63,7 @@ p { margin: 0; }
 /* Forms */
 label { font-weight: 800; font-size: 16px; }
 .field { display: flex; flex-direction: column; gap: 8px; }
-input[type=text], input[type=number], input[type=search], input[type=email], textarea, select {
+input[type=text], input[type=number], input[type=search], input[type=email], input[type=url], textarea, select {
   width: 100%; min-height: 56px; padding: 0 16px; border-radius: var(--radius);
   border: 2px solid var(--line); background: var(--night); color: var(--cream);
   font-family: var(--body); font-weight: 600; font-size: 19px;

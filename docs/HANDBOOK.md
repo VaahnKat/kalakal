@@ -1,9 +1,9 @@
 # Kalakal Handbook
 
 The one document that explains what Kalakal is, how it is built, and how to change it.
-Version 0.7 · November 2026 · Owner: Prabha
+Version 0.8 · November 2026 · Owner: Prabha
 
-**Live site:** https://kalakal.se (the old address kalakal.prabhuwinz17.workers.dev forwards visitors here)
+**Live site:** https://kalakal.prabhuwinz17.workers.dev, moving to https://kalakal.se (nameservers changed 14 Nov 2026, waiting for Cloudflare to activate the domain)
 **Code:** https://github.com/VaahnKat/kalakal (branch `main` deploys automatically)
 **Files and originals:** Google Drive → `Kalakal`
 
@@ -181,6 +181,8 @@ Each recipe says which file to open and what to change. After any change: test l
 | Edit the guide page or FAQ | `public/create.html` | Plain HTML; each way is a `<section class="way">`, each FAQ a `<details>` |
 | Change the invite text or share buttons | `public/js/host.js` | `invite()` and `setupShare()`; buttons in the lobby in `public/host.html` (`.share`) |
 | Change how editing a live game works | `public/js/host.js` (`editQuizBtn`, `quizToDraft`) and `src/index.js` (`update_quiz`, lobby only) |
+| Change the builder steps, start screen or question list | `public/host.html` (section `data-screen="editor"`, styles under `/* builder ("studio") */`) and `public/js/host.js` (`openBuilder`, `goStep`, `renderEditor`, `renderOutline`, `slideProblem`, `updateChrome`) |
+| Change the sign-in banner or the save card | `public/host.html` (`#signinBanner`, `#saveCard`) and `public/js/host.js` (`refreshAccount`, `updateChrome`, `renderMeta`) |
 | Re-record the step GIFs after a UI change | `tools/record_guides.py` | `npm run dev`, then `npm run guides` (or `python3 tools/record_guides.py paste` for one) |
 
 How pictures work today: uploads are shrunk in the browser and saved with the draft (browser storage, ~5 MB in total). During a game they stay in the host's tab and show on the big screen only; phones get just the answers. Server storage (Cloudflare R2) comes with accounts.
@@ -194,10 +196,11 @@ How pictures work today: uploads are shrunk in the browser and saved with the dr
 | Change the site-wide daily budget | `LIMITS.siteUnits` (1 unit = 1 quiz ≈ 90 Neurons; keep the total under the free 10,000 Neurons a day) |
 | Change what the AI is told | `systemPrompt`, `quizPrompt`, `tweakPrompt` |
 | Add a language to the menu | `public/host.html`, the `aiLang` select (any language also works via "Other…") |
+| Change how web links are read (Create from a link) | `readLink` and `pageText` in `src/ai.js` (size limit `LINK_MAX_BYTES`, blocked sites, text clean-up) |
 | Change options (counts, audiences, levels) | `COUNTS`, `AUDIENCES`, `LEVELS` in `src/ai.js` and the matching selects in `public/host.html` |
 | See AI usage and cost | Cloudflare dashboard → AI → Workers AI (Neurons used per day) and Workers & Pages → kalakal → Logs |
 
-How it works: the browser sends the topic/notes and options to `POST /api/ai/quiz`. The Worker checks the daily allowance (`AiQuota` Durable Object, keyed by a daily-salted hash of the IP address, so no personal data is stored), asks the model for questions in the quick-type format, cleans and parses them with the same parser as pasted text, shuffles the answers, and returns slides. Nothing is added to the quiz until the host reviews it. If the model fails, the allowance is refunded. When the allowance runs out, people are offered **Copy AI prompt** instead.
+How it works: the browser sends the topic/notes (or a web link) and options to `POST /api/ai/quiz`. With a link, the Worker opens the public page (max 2 MB, 12 s, no private addresses, no video or social sites), keeps the readable text of the article or main part, and uses the first 12,000 characters as notes; the page title becomes the topic and the quiz title. The Worker checks the daily allowance (`AiQuota` Durable Object, keyed by a daily-salted hash of the IP address, so no personal data is stored), asks the model for questions in the quick-type format, cleans and parses them with the same parser as pasted text, shuffles the answers, and returns slides. Nothing is added to the quiz until the host reviews it. If the model fails, the allowance is refunded. When the allowance runs out, people are offered **Copy AI prompt** instead.
 
 Local development uses fake AI replies (`npm run dev`, `AI_MOCK=1`), so it works without a Cloudflare login. `npm run dev:ai` uses the real model (needs `npx wrangler login`).
 
@@ -378,7 +381,9 @@ Manual deploy (if ever needed): `npx wrangler login` then `npm run deploy`.
 3. Workers & Pages → **kalakal** → Settings → **Domains & Routes** → Add → **Custom domain** → `kalakal.se`. Repeat for `www.kalakal.se`. Cloudflare creates the DNS records and the HTTPS certificate.
 4. Optional: Rules → Redirect Rules → send `www.kalakal.se/*` to `https://kalakal.se/${1}` so there is one address.
 
-**Status: live since 14 Nov 2026.** The app uses whatever address it is opened on, so the lobby shows "Join at kalakal.se". Pages opened on the old workers.dev address or on www.kalakal.se forward to kalakal.se (`MAIN_HOST` at the top of `public/js/common.js`); a host page with a running game is left alone. `public/robots.txt` and `public/sitemap.xml` help search engines; add new public pages to the sitemap.
+**Status (14 Nov 2026):** bought at Strato; nameservers at Strato changed to `emma.ns.cloudflare.com` and `evan.ns.cloudflare.com` (DNS → NS record → Own name server). Waiting for Cloudflare to show **Active**, then do step 3. Strato e-mail does not work with Cloudflare nameservers; use Cloudflare Email Routing for `hello@kalakal.se`.
+
+The app uses whatever address it is opened on, so the lobby shows "Join at kalakal.se" once the domain is connected. Forwarding from workers.dev and www to kalakal.se is built in but **off** until the domain works: set `FORWARD = true` at the top of `public/js/common.js` (`MAIN_HOST`); a host page with a running game is never forwarded. `public/robots.txt` and `public/sitemap.xml` help search engines; add new public pages to the sitemap.
 
 ### Roll back
 
